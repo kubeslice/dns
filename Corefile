@@ -1,0 +1,4 @@
+.:1053 {
+  forward . 9.9.9.9
+  kubeslice
+}
