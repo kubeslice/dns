@@ -2,40 +2,76 @@ package kubeslice
 
 import (
 	"context"
-	"net"
+
+	"github.com/coredns/coredns/plugin/etcd/msg"
+	"github.com/coredns/coredns/request"
 
 	"github.com/coredns/coredns/plugin"
-	// "github.com/coredns/coredns/plugin/etcd/msg"
-	clog "github.com/coredns/coredns/plugin/pkg/log"
-
 	"github.com/miekg/dns"
 )
 
-var log = clog.NewWithPlugin("kubeslice")
-
+// implements plugin.servicebackend interface
 type Kubeslice struct {
 	Next plugin.Handler
 }
 
-// ServeDNS implements the plugin.Handler interface.
-func (ks Kubeslice) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
-	log.Debug("Received request", r)
+func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact bool, opt plugin.Options) ([]msg.Service, error) {
 
-	if r.Question[0].Qtype != dns.TypeA {
-		return plugin.NextOrFailure(ks.Name(), ks.Next, ctx, w, r)
+	var svcs []msg.Service
+
+	// kubeslice only support A records for now, so return empty list if request is not A
+	if state.QType() != dns.TypeA {
+		log.Debug("received invalid request type, only A is supported now")
+		return svcs, nil
 	}
 
-	m := new(dns.Msg)
-	m.SetReply(r)
-	m.Authoritative = true
-	hdr := dns.RR_Header{Name: r.Question[0].Name, Ttl: 8482, Class: dns.ClassINET, Rrtype: dns.TypeA}
-	ip := net.ParseIP("10.20.10.2")
-	m.Answer = []dns.RR{&dns.A{Hdr: hdr, A: ip}}
+	log.Debug("fetching kubeslice services")
 
-	w.WriteMsg(m)
-	return dns.RcodeSuccess, nil
+	svc := msg.Service{
+		Host: "192.168.1.20",
+	}
+
+	svcs = append(svcs, svc)
+
+	return svcs, nil
 
 }
 
-// Name implements the Handler interface.
-func (e Kubeslice) Name() string { return "kubeslice" }
+// TODO fill later
+func (ks *Kubeslice) Reverse(ctx context.Context, state request.Request, exact bool, opt plugin.Options) ([]msg.Service, error) {
+	var svcs []msg.Service
+	log.Debug("kubeslice reverse lookup")
+	return svcs, nil
+}
+
+// TODO fill later
+func (ks *Kubeslice) Lookup(ctx context.Context, state request.Request, name string, typ uint16) (*dns.Msg, error) {
+	log.Debug("kubeslice lookup")
+	msg := &dns.Msg{}
+	return msg, nil
+}
+
+// TODO fill later
+func (ks *Kubeslice) Records(ctx context.Context, state request.Request, exact bool) ([]msg.Service, error) {
+	var svcs []msg.Service
+	log.Debug("kubeslice records")
+	return svcs, nil
+}
+
+// TODO fill later
+func (ks *Kubeslice) MinTTL(state request.Request) uint32 {
+	log.Debug("kubeslice ttl")
+	return 60
+}
+
+// TODO fill later
+func (ks *Kubeslice) Serial(state request.Request) uint32 {
+	log.Debug("kubeslice soa")
+	return 1
+}
+
+// TODO fill later
+func (ks *Kubeslice) IsNameError(err error) bool {
+	log.Debug("kubeslice isnameerror")
+	return false
+}
