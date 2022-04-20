@@ -17,7 +17,7 @@ func setup(c *caddy.Controller) error {
 		// If there was another token, return an error, because we don't have any configuration.
 		// Any errors returned from this setup function should be wrapped with plugin.Error, so we
 		// can present a slightly nicer error message to the user.
-		return plugin.Error("example", c.ArgErr())
+		return plugin.Error("kubeslice", c.ArgErr())
 	}
 
 	// Add the Plugin to CoreDNS, so Servers can use it in their plugin chain.
