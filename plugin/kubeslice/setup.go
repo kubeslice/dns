@@ -6,6 +6,7 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"os"
 
+	dnsCache "bitbucket.org/realtimeai/kubeslice-dns/plugin/kubeslice/cache"
 	meshv1beta1 "bitbucket.org/realtimeai/kubeslice-operator/api/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -37,12 +38,11 @@ func setup(c *caddy.Controller) error {
 		return plugin.Error("kubeslice", c.ArgErr())
 	}
 
-	ks := Kubeslice{}
+	cache := dnsCache.NewEndpointsCache()
 
 	// Add the Plugin to CoreDNS, so Servers can use it in their plugin chain.
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
-		ks.Next = next
-		return ks
+		return Kubeslice{Next: next, EndpointsCache: cache}
 	})
 
 	mgr, err := manager.New(
@@ -59,7 +59,7 @@ func setup(c *caddy.Controller) error {
 		ControllerManagedBy(mgr).          // Create the ControllerManagedBy
 		For(&meshv1beta1.ServiceImport{}). // ReplicaSet is the Application API
 		Complete(&ServiceImportReconciler{
-			Kubeslice: ks,
+			EndpointsCache: cache,
 		})
 	if err != nil {
 		log.Error(err, "could not create controller")

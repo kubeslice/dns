@@ -6,20 +6,15 @@ import (
 	"github.com/coredns/coredns/plugin/etcd/msg"
 	"github.com/coredns/coredns/request"
 
+	dnsCache "bitbucket.org/realtimeai/kubeslice-dns/plugin/kubeslice/cache"
 	"github.com/coredns/coredns/plugin"
 	"github.com/miekg/dns"
 )
 
-// SliceEndpoint corresponds to a dns entry for an endpint
-type SliceEndpoint struct {
-	Host string
-	IP   string
-}
-
 // implements plugin.servicebackend interface
 type Kubeslice struct {
 	Next           plugin.Handler
-	SliceEndpoints []SliceEndpoint
+	EndpointsCache dnsCache.EndpointsCache
 }
 
 func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact bool, opt plugin.Options) ([]msg.Service, error) {
@@ -34,7 +29,7 @@ func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact 
 
 	log.Debug("fetching kubeslice services")
 
-	log.Debug(ks.SliceEndpoints)
+	log.Debug(ks.EndpointsCache)
 
 	svc := msg.Service{
 		Host: "192.168.1.20",

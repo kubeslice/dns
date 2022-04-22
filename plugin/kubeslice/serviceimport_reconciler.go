@@ -3,6 +3,8 @@ package kubeslice
 import (
 	"context"
 
+	dnsCache "bitbucket.org/realtimeai/kubeslice-dns/plugin/kubeslice/cache"
+	"bitbucket.org/realtimeai/kubeslice-dns/plugin/kubeslice/slice"
 	meshv1beta1 "bitbucket.org/realtimeai/kubeslice-operator/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -11,7 +13,7 @@ import (
 // ReplicaSetReconciler is a simple ControllerManagedBy example implementation.
 type ServiceImportReconciler struct {
 	client.Client
-	Kubeslice Kubeslice
+	EndpointsCache dnsCache.EndpointsCache
 }
 
 // Watch the ServiceImport changes and adjust dns cache accordingly
@@ -25,15 +27,19 @@ func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.R
 
 	log.Info("got si")
 
+	eps := []slice.Endpoint{}
+
 	for _, ep := range si.Status.Endpoints {
-		endpoint := SliceEndpoint{
+		endpoint := slice.Endpoint{
 			Host: ep.DNSName,
 			IP:   ep.IP,
 		}
-		r.Kubeslice.SliceEndpoints = append(r.Kubeslice.SliceEndpoints, endpoint)
+		eps = append(eps, endpoint)
 	}
 
-	log.Info(r.Kubeslice.SliceEndpoints)
+	r.EndpointsCache.Put(si.Name, si.Spec.Slice, si.Namespace, eps)
+
+	log.Info(r.EndpointsCache.GetAll())
 
 	return reconcile.Result{}, nil
 }
