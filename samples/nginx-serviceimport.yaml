@@ -1,0 +1,23 @@
+apiVersion: mesh.avesha.io/v1beta1
+kind: ServiceImport
+metadata:
+  name: nginx
+spec:
+  slice: green
+  dnsName: green.svc
+  ports:
+  - name: http
+    containerPort: 80
+    protocol: TCP
+status:
+  importStatus: READY
+  endpoints:
+  - name: nginx-d955f6db-9nlxm
+    ip: 10.20.1.2
+    port: 80
+    clusterID: jd-cluster-7
+  - name: nginx-d955f6db-asdad
+    ip: 10.20.1.3
+    port: 80
+    clusterID: jd-cluster-8
+
