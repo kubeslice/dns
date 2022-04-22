@@ -27,15 +27,22 @@ func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact 
 		return svcs, nil
 	}
 
-	log.Debug("fetching kubeslice services")
+	log.Info("fetching kubeslice services")
 
-	log.Debug(ks.EndpointsCache)
+	name := state.Name()
+	name = name[:len(name)-1]
 
-	svc := msg.Service{
-		Host: "192.168.1.20",
+	eps := ks.EndpointsCache.GetAll()
+
+	for _, ep := range eps {
+		if ep.Host == name {
+			svc := msg.Service{
+				Host: ep.IP,
+			}
+
+			svcs = append(svcs, svc)
+		}
 	}
-
-	svcs = append(svcs, svc)
 
 	return svcs, nil
 
