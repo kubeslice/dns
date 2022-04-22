@@ -4,15 +4,16 @@ import (
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
+	"os"
 
+	meshv1beta1 "bitbucket.org/realtimeai/kubeslice-operator/api/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-  clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	meshv1beta1 "bitbucket.org/realtimeai/kubeslice-operator/api/v1beta1"
-  utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-  "k8s.io/apimachinery/pkg/runtime"
 )
 
 var scheme = runtime.NewScheme()
@@ -21,7 +22,6 @@ func init() {
 	clientgoscheme.AddToScheme(scheme)
 	utilruntime.Must(meshv1beta1.AddToScheme(scheme))
 }
-
 
 // init registers this plugin.
 func init() { plugin.Register("kubeslice", setup) }
@@ -37,34 +37,42 @@ func setup(c *caddy.Controller) error {
 		return plugin.Error("kubeslice", c.ArgErr())
 	}
 
+	ks := Kubeslice{}
+
 	// Add the Plugin to CoreDNS, so Servers can use it in their plugin chain.
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
-		return Kubeslice{Next: next}
+		ks.Next = next
+		return ks
 	})
 
 	mgr, err := manager.New(
-    config.GetConfigOrDie(), manager.Options{
-      Scheme: scheme,
-    },
-  )
+		config.GetConfigOrDie(), manager.Options{
+			Scheme: scheme,
+		},
+	)
 	if err != nil {
 		log.Error(err, "could not create manager")
 		return err
 	}
 
-  err = builder.
-		ControllerManagedBy(mgr).  // Create the ControllerManagedBy
+	err = builder.
+		ControllerManagedBy(mgr).          // Create the ControllerManagedBy
 		For(&meshv1beta1.ServiceImport{}). // ReplicaSet is the Application API
-		Complete(&ServiceImportReconciler{})
+		Complete(&ServiceImportReconciler{
+			Kubeslice: ks,
+		})
 	if err != nil {
 		log.Error(err, "could not create controller")
-    return err
+		return err
 	}
 
-	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-		log.Error(err, "could not start manager")
-    return err
-	}
+	// start manager in the background
+	go func() {
+		if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+			log.Error(err, "could not start manager")
+			os.Exit(1)
+		}
+	}()
 
 	// All OK, return a nil error.
 	return nil

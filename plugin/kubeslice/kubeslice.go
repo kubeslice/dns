@@ -10,9 +10,16 @@ import (
 	"github.com/miekg/dns"
 )
 
+// SliceEndpoint corresponds to a dns entry for an endpint
+type SliceEndpoint struct {
+	Host string
+	IP   string
+}
+
 // implements plugin.servicebackend interface
 type Kubeslice struct {
-	Next plugin.Handler
+	Next           plugin.Handler
+	SliceEndpoints []SliceEndpoint
 }
 
 func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact bool, opt plugin.Options) ([]msg.Service, error) {
@@ -26,6 +33,8 @@ func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact 
 	}
 
 	log.Debug("fetching kubeslice services")
+
+	log.Debug(ks.SliceEndpoints)
 
 	svc := msg.Service{
 		Host: "192.168.1.20",

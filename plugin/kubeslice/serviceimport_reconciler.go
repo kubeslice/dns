@@ -11,15 +11,10 @@ import (
 // ReplicaSetReconciler is a simple ControllerManagedBy example implementation.
 type ServiceImportReconciler struct {
 	client.Client
+	Kubeslice Kubeslice
 }
 
-// Implement the business logic:
-// This function will be called when there is a change to a ReplicaSet or a Pod with an OwnerReference
-// to a ReplicaSet.
-//
-// * Read the ReplicaSet
-// * Read the Pods
-// * Set a Label on the ReplicaSet with the Pod count.
+// Watch the ServiceImport changes and adjust dns cache accordingly
 func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 
 	si := &meshv1beta1.ServiceImport{}
@@ -29,6 +24,16 @@ func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.R
 	}
 
 	log.Info("got si")
+
+	for _, ep := range si.Status.Endpoints {
+		endpoint := SliceEndpoint{
+			Host: ep.DNSName,
+			IP:   ep.IP,
+		}
+		r.Kubeslice.SliceEndpoints = append(r.Kubeslice.SliceEndpoints, endpoint)
+	}
+
+	log.Info(r.Kubeslice.SliceEndpoints)
 
 	return reconcile.Result{}, nil
 }
