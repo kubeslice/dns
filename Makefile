@@ -24,3 +24,7 @@ docker-build:
 .PHONY: docker-run
 docker-run:
 	docker run -ti ${IMG}
+
+.PHONY: docker-push
+docker-push: ## Push docker image
+	docker push ${IMG}
