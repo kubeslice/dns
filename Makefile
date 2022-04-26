@@ -20,3 +20,7 @@ run:
 .PHONY: docker-build
 docker-build:
 	docker build -t ${IMG} .
+
+.PHONY: docker-run
+docker-run:
+	docker run -ti ${IMG}
