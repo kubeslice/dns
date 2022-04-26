@@ -8,18 +8,20 @@ COPY go.sum go.sum
 # Copy the go source
 COPY main.go main.go
 COPY plugin/ plugin/
-COPY vendor/ vencor/
+COPY vendor/ vendor/
 
 # Build
 RUN go env -w GOPRIVATE=bitbucket.org/realtimeai && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -mod=vendor -a -o coredns main.go
 
-FROM scratch
+FROM gcr.io/distroless/static:nonroot
 
 WORKDIR /
 
 COPY --from=builder /workspace/coredns .
 COPY Corefile Corefile
 
-EXPOSE 53 53/udp
+USER nonroot:nonroot
+
+EXPOSE 1053 1053/udp
 ENTRYPOINT ["/coredns"]
