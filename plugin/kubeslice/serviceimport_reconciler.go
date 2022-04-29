@@ -34,7 +34,11 @@ func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.R
 			Host: ep.DNSName,
 			IP:   ep.IP,
 		}
-		eps = append(eps, endpoint)
+		endpoint2 := slice.Endpoint{
+			Host: si.Spec.DNSName,
+			IP:   ep.IP,
+		}
+		eps = append(eps, endpoint, endpoint2)
 	}
 
 	r.EndpointsCache.Put(si.Name, si.Spec.Slice, si.Namespace, eps)

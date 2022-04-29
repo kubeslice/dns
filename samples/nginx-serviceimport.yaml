@@ -7,7 +7,7 @@ metadata:
   namespace: default
 spec:
   slice: green
-  dnsName: green.default.svc.slice.local
+  dnsName: nginx.default.svc.slice.local
   ports:
   - name: http
     containerPort: 80
@@ -16,12 +16,12 @@ status:
   importStatus: READY
   endpoints:
   - name: nginx-d955f6db-9nlxm
-    ip: 10.20.1.2
+    ip: 10.7.1.94
     port: 80
     clusterId: jd-cluster-7
-    dnsName: nginx-d955f6db-9nlxm.jd-cluster-7.nginx.default.svc.slice.local
-  - name: nginx-d955f6db-asdad
-    ip: 10.20.1.3
+    dnsName: nginx-d955f6db-9nlxm.cluster-7-jd.nginx.default.svc.slice.local
+  - name: nginx-d955f6db-wjrjv
+    ip: 10.7.2.59
     port: 80
-    clusterId: jd-cluster-8
-    dnsName: nginx-d955f6db-asdad.jd-cluster-8.nginx.default.svc.slice.local
+    clusterId: jd-cluster-7
+    dnsName: nginx-d955f6db-wjrjv.cluster-7-jd.nginx.default.svc.slice.local
