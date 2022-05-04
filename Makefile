@@ -1,5 +1,5 @@
 VERSION ?= 0.0.1
-IMG ?= nexus.dev.aveshalabs.io/kubeslice-dns:$(VERSION)
+IMG ?= nexus.dev.aveshalabs.io/kubeslice/dns:$(VERSION)
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
