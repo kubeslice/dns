@@ -1,4 +1,4 @@
-module bitbucket.org/realtimeai/kubeslice-dns
+module github.com/kubeslice/dns
 
 go 1.18
 
