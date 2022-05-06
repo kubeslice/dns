@@ -6,8 +6,8 @@ import (
 	"github.com/coredns/coredns/plugin/etcd/msg"
 	"github.com/coredns/coredns/request"
 
-	dnsCache "bitbucket.org/realtimeai/kubeslice-dns/plugin/kubeslice/cache"
 	"github.com/coredns/coredns/plugin"
+	dnsCache "github.com/kubeslice/dns/plugin/kubeslice/cache"
 	"github.com/miekg/dns"
 )
 

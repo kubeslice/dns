@@ -1,7 +1,7 @@
 package cache
 
 import (
-	"bitbucket.org/realtimeai/kubeslice-dns/plugin/kubeslice/slice"
+	"github.com/kubeslice/dns/plugin/kubeslice/slice"
 )
 
 type EndpointsCache interface {

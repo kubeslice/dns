@@ -1,8 +1,8 @@
 package main
 
 import (
-	_ "bitbucket.org/realtimeai/kubeslice-dns/plugin/kubeslice"
 	_ "github.com/coredns/coredns/core/plugin" // Plug in CoreDNS.
+	_ "github.com/kubeslice/dns/plugin/kubeslice"
 
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/coremain"
