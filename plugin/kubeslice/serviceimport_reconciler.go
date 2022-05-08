@@ -3,7 +3,7 @@ package kubeslice
 import (
 	"context"
 
-	meshv1beta1 "bitbucket.org/realtimeai/kubeslice-operator/api/v1beta1"
+	kubeslicev1beta1 "github.com/kubeslice/worker-operator/api/v1beta1"
 	dnsCache "github.com/kubeslice/dns/plugin/kubeslice/cache"
 	"github.com/kubeslice/dns/plugin/kubeslice/slice"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,7 +19,7 @@ type ServiceImportReconciler struct {
 // Watch the ServiceImport changes and adjust dns cache accordingly
 func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 
-	si := &meshv1beta1.ServiceImport{}
+	si := &kubeslicev1beta1.ServiceImport{}
 	err := r.Get(ctx, req.NamespacedName, si)
 	if err != nil {
 		return reconcile.Result{}, err

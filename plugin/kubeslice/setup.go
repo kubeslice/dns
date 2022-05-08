@@ -6,7 +6,7 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"os"
 
-	meshv1beta1 "bitbucket.org/realtimeai/kubeslice-operator/api/v1beta1"
+	kubeslicev1beta1 "github.com/kubeslice/worker-operator/api/v1beta1"
 	dnsCache "github.com/kubeslice/dns/plugin/kubeslice/cache"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -21,7 +21,7 @@ var scheme = runtime.NewScheme()
 
 func init() {
 	clientgoscheme.AddToScheme(scheme)
-	utilruntime.Must(meshv1beta1.AddToScheme(scheme))
+	utilruntime.Must(kubeslicev1beta1.AddToScheme(scheme))
 }
 
 // init registers this plugin.
@@ -56,8 +56,8 @@ func setup(c *caddy.Controller) error {
 	}
 
 	err = builder.
-		ControllerManagedBy(mgr).          // Create the ControllerManagedBy
-		For(&meshv1beta1.ServiceImport{}). // ReplicaSet is the Application API
+		ControllerManagedBy(mgr).               // Create the ControllerManagedBy
+		For(&kubeslicev1beta1.ServiceImport{}). // ReplicaSet is the Application API
 		Complete(&ServiceImportReconciler{
 			EndpointsCache: cache,
 		})
