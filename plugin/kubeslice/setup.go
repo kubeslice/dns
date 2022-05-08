@@ -6,8 +6,8 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"os"
 
-	kubeslicev1beta1 "github.com/kubeslice/worker-operator/api/v1beta1"
 	dnsCache "github.com/kubeslice/dns/plugin/kubeslice/cache"
+	kubeslicev1beta1 "github.com/kubeslice/worker-operator/api/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
