@@ -3,9 +3,9 @@ module github.com/kubeslice/dns
 go 1.18
 
 require (
-	bitbucket.org/realtimeai/kubeslice-operator v1.16.0
 	github.com/coredns/caddy v1.1.1
 	github.com/coredns/coredns v1.9.1
+	github.com/kubeslice/worker-operator v1.0.1-0.20220508070554-92170ae62dd6
 	github.com/miekg/dns v1.1.46
 	k8s.io/apimachinery v0.23.5
 	k8s.io/client-go v0.23.5
@@ -101,7 +101,7 @@ require (
 	google.golang.org/api v0.70.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220303160752-862486edd9cc // indirect
-	google.golang.org/grpc v1.44.0 // indirect
+	google.golang.org/grpc v1.45.0 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/DataDog/dd-trace-go.v1 v1.36.2 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
