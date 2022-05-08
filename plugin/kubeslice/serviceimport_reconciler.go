@@ -3,9 +3,9 @@ package kubeslice
 import (
 	"context"
 
-	kubeslicev1beta1 "github.com/kubeslice/worker-operator/api/v1beta1"
 	dnsCache "github.com/kubeslice/dns/plugin/kubeslice/cache"
 	"github.com/kubeslice/dns/plugin/kubeslice/slice"
+	kubeslicev1beta1 "github.com/kubeslice/worker-operator/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
