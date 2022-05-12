@@ -1,5 +1,4 @@
 .:1053 {
   debug
-  forward . 9.9.9.9
   kubeslice
 }
