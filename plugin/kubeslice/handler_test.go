@@ -2,7 +2,6 @@ package kubeslice_test
 
 import (
 	"context"
-	"fmt"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gmeasure"
@@ -170,8 +169,6 @@ var _ = Describe("Handler", func() {
 
 			repaginationStats := experiment.GetStats("dns-query")
 			medianDuration := repaginationStats.DurationFor(gmeasure.StatMedian)
-
-			fmt.Println(medianDuration)
 
 			Expect(medianDuration).To(BeNumerically("~", 5*time.Microsecond, 5*time.Microsecond))
 		})
