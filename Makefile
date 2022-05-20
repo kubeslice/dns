@@ -28,3 +28,7 @@ docker-run:
 .PHONY: docker-push
 docker-push: ## Push docker image
 	docker push ${IMG}
+
+.PHONY: test
+test: # Run UTs
+	go test ./...
