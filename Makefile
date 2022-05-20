@@ -1,4 +1,4 @@
-VERSION ?= 0.0.1
+VERSION ?= latest
 IMG ?= docker.io/aveshasystems/dns:$(VERSION)
 
 .PHONY: build
