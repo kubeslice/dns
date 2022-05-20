@@ -16,11 +16,7 @@ var log = clog.NewWithPlugin("kubeslice")
 
 // ServeDNS implements the plugin.Handler interface.
 func (ks Kubeslice) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
-	log.Debug("Received request", r)
-
-	if r.Question[0].Qtype != dns.TypeA {
-		return plugin.NextOrFailure(ks.Name(), ks.Next, ctx, w, r)
-	}
+	log.Debug("Question type", r.Question)
 
 	state := request.Request{W: w, Req: r}
 	zone := "slice.local"
