@@ -53,7 +53,7 @@ spec:
       - name: avesha-nexus
       containers:
       - name: "dns"
-        image: "nexus.dev.aveshalabs.io/kubeslice-dns:0.0.1"
+        image: "docker.io/aveshasystems/dns:0.0.1"
         imagePullPolicy: IfNotPresent
         resources:
           limits:
