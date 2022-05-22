@@ -67,7 +67,7 @@ var _ = Describe("Handler", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(code).To(Equal(dns.RcodeSuccess))
 			Expect(w.Msg.Answer).To(HaveLen(1))
-			Expect(w.Msg.Answer[0].String()).To(Equal("nginx.default.slice.local.	0	IN	A	10.0.0.1"))
+			Expect(w.Msg.Answer[0].String()).To(Equal("nginx.default.slice.local.	60	IN	A	10.0.0.1"))
 		})
 
 		It("should return multiple A records", func() {
@@ -98,8 +98,8 @@ var _ = Describe("Handler", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(code).To(Equal(dns.RcodeSuccess))
 			Expect(w.Msg.Answer).To(HaveLen(2))
-			Expect(w.Msg.Answer[0].String()).To(Equal("nginx.default.slice.local.	0	IN	A	10.0.0.1"))
-			Expect(w.Msg.Answer[1].String()).To(Equal("nginx.default.slice.local.	0	IN	A	10.0.1.1"))
+			Expect(w.Msg.Answer[0].String()).To(Equal("nginx.default.slice.local.	60	IN	A	10.0.0.1"))
+			Expect(w.Msg.Answer[1].String()).To(Equal("nginx.default.slice.local.	60	IN	A	10.0.1.1"))
 		})
 
 		It("should return empty response for AAAA requests", func() {
