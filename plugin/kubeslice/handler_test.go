@@ -4,7 +4,9 @@ import (
 	"context"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gmeasure"
 	"net"
+	"time"
 
 	"github.com/kubeslice/dns/plugin/kubeslice"
 	dnsCache "github.com/kubeslice/dns/plugin/kubeslice/cache"
@@ -65,7 +67,7 @@ var _ = Describe("Handler", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(code).To(Equal(dns.RcodeSuccess))
 			Expect(w.Msg.Answer).To(HaveLen(1))
-			Expect(w.Msg.Answer[0].String()).To(Equal("nginx.default.slice.local.	0	IN	A	10.0.0.1"))
+			Expect(w.Msg.Answer[0].String()).To(Equal("nginx.default.slice.local.	60	IN	A	10.0.0.1"))
 		})
 
 		It("should return multiple A records", func() {
@@ -96,8 +98,8 @@ var _ = Describe("Handler", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(code).To(Equal(dns.RcodeSuccess))
 			Expect(w.Msg.Answer).To(HaveLen(2))
-			Expect(w.Msg.Answer[0].String()).To(Equal("nginx.default.slice.local.	0	IN	A	10.0.0.1"))
-			Expect(w.Msg.Answer[1].String()).To(Equal("nginx.default.slice.local.	0	IN	A	10.0.1.1"))
+			Expect(w.Msg.Answer[0].String()).To(Equal("nginx.default.slice.local.	60	IN	A	10.0.0.1"))
+			Expect(w.Msg.Answer[1].String()).To(Equal("nginx.default.slice.local.	60	IN	A	10.0.1.1"))
 		})
 
 		It("should return empty response for AAAA requests", func() {
@@ -128,6 +130,47 @@ var _ = Describe("Handler", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(code).To(Equal(dns.RcodeSuccess))
 			Expect(w.Msg.Answer).To(HaveLen(0))
+		})
+
+		It("benchmark dns query", Serial, Label("measurement"), func() {
+			experiment := gmeasure.NewExperiment("dns")
+			AddReportEntry(experiment.Name, experiment)
+
+			cache := dnsCache.NewEndpointsCache()
+
+			count := 1000000000
+			eps := make([]slice.Endpoint, count)
+			for i := 0; i < count; i++ {
+				eps[i].Host = "test"
+				eps[i].IP = "10.0.0.0"
+			}
+
+			cache.Put("nginx", "green", "default", eps)
+
+			ks := kubeslice.Kubeslice{
+				EndpointsCache: cache,
+			}
+
+			r := &dns.Msg{
+				Question: []dns.Question{{
+					Name:  "nginx.default.slice.local.",
+					Qtype: dns.TypeAAAA,
+				}},
+			}
+			w := &mockResponse{}
+
+			experiment.Sample(func(idx int) {
+				experiment.MeasureDuration("dns-query", func() {
+					code, err := ks.ServeDNS(context.Background(), w, r)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(code).To(Equal(dns.RcodeSuccess))
+				})
+			}, gmeasure.SamplingConfig{N: 10, Duration: time.Minute})
+
+			repaginationStats := experiment.GetStats("dns-query")
+			medianDuration := repaginationStats.DurationFor(gmeasure.StatMedian)
+
+			Expect(medianDuration).To(BeNumerically("~", 5*time.Microsecond, 5*time.Microsecond))
 		})
 
 	})

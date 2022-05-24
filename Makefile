@@ -1,4 +1,4 @@
-VERSION ?= 0.0.1
+VERSION ?= latest
 IMG ?= docker.io/aveshasystems/dns:$(VERSION)
 
 .PHONY: build
@@ -28,3 +28,7 @@ docker-run:
 .PHONY: docker-push
 docker-push: ## Push docker image
 	docker push ${IMG}
+
+.PHONY: test
+test: # Run UTs
+	go test ./...

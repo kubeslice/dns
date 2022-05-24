@@ -38,6 +38,7 @@ func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact 
 		if ep.Host == name {
 			svc := msg.Service{
 				Host: ep.IP,
+				TTL:  60,
 			}
 
 			svcs = append(svcs, svc)
