@@ -1,13 +1,13 @@
 # apply using k apply -f
 # then use k edit-status command to update the status fields
-apiVersion: mesh.avesha.io/v1beta1
+apiVersion: networking.kubeslice.io/v1beta1
 kind: ServiceImport
 metadata:
-  name: nginx
+  name: web
   namespace: default
 spec:
   slice: green
-  dnsName: nginx.default.svc.slice.local
+  dnsName: web.default.svc.slice.local
   ports:
   - name: http
     containerPort: 80
@@ -15,13 +15,13 @@ spec:
 status:
   importStatus: READY
   endpoints:
-  - name: nginx-d955f6db-9nlxm
+  - name: web-d955f6db-9nlxm
     ip: 10.7.1.94
     port: 80
     clusterId: jd-cluster-7
-    dnsName: nginx-d955f6db-9nlxm.cluster-7-jd.nginx.default.svc.slice.local
-  - name: nginx-d955f6db-wjrjv
+    dnsName: web-d955f6db-9nlxm.cluster-7-jd.web.default.svc.slice.local
+  - name: web-d955f6db-wjrjv
     ip: 10.7.2.59
     port: 80
     clusterId: jd-cluster-7
-    dnsName: nginx-d955f6db-wjrjv.cluster-7-jd.nginx.default.svc.slice.local
+    dnsName: web-d955f6db-wjrjv.cluster-7-jd.web.default.svc.slice.local
