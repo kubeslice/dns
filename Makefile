@@ -32,3 +32,7 @@ docker-push: ## Push docker image
 .PHONY: test
 test: # Run UTs
 	go test ./...
+
+.PHONY: test-docker
+test-docker:
+	docker build -t test -f test.Dockerfile . && docker run test
