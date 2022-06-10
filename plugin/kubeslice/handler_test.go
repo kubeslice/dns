@@ -138,7 +138,7 @@ var _ = Describe("Handler", func() {
 
 			cache := dnsCache.NewEndpointsCache()
 
-			count := 1000000000
+			count := 10000
 			eps := make([]slice.Endpoint, count)
 			for i := 0; i < count; i++ {
 				eps[i].Host = "test"
