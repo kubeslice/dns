@@ -21,14 +21,6 @@ func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact 
 
 	var svcs []msg.Service
 
-	// kubeslice only support A records for now, so return empty list if request is not A
-	if state.QType() != dns.TypeA {
-		log.Debug("received invalid request type, only A is supported now")
-		return svcs, nil
-	}
-
-	log.Info("fetching kubeslice services")
-
 	name := state.Name()
 	name = name[:len(name)-1]
 
