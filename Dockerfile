@@ -1,6 +1,6 @@
 FROM golang:1.18 as builder
 
-WORKDIR /
+WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
@@ -18,7 +18,7 @@ FROM gcr.io/distroless/static:nonroot
 
 WORKDIR /
 
-COPY --from=builder coredns .
+COPY --from=builder /workspace/coredns .
 
 USER nonroot:nonroot
 
