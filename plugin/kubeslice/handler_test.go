@@ -34,8 +34,9 @@ var _ = Describe("Handler", func() {
 
 			code, err := ks.ServeDNS(context.Background(), w, r)
 
-			Expect(err).To(HaveOccurred())
-			Expect(code).To(Equal(dns.RcodeNameError))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(code).To(Equal(dns.RcodeSuccess))
+			Expect(w.Msg.Answer).To(HaveLen(0))
 		})
 
 		It("should return correct A record", func() {
@@ -126,8 +127,9 @@ var _ = Describe("Handler", func() {
 
 			code, err := ks.ServeDNS(context.Background(), w, r)
 
-			Expect(err).To(HaveOccurred())
-			Expect(code).To(Equal(dns.RcodeNotImplemented))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(code).To(Equal(dns.RcodeSuccess))
+			Expect(w.Msg.Answer).To(HaveLen(0))
 		})
 
 		It("benchmark dns query", Serial, Label("measurement"), func() {
@@ -160,8 +162,8 @@ var _ = Describe("Handler", func() {
 			experiment.Sample(func(idx int) {
 				experiment.MeasureDuration("dns-query", func() {
 					code, err := ks.ServeDNS(context.Background(), w, r)
-					Expect(err).To(HaveOccurred())
-					Expect(code).To(Equal(dns.RcodeNotImplemented))
+					Expect(err).ToNot(HaveOccurred())
+					Expect(code).To(Equal(dns.RcodeSuccess))
 				})
 			}, gmeasure.SamplingConfig{N: 10, Duration: time.Minute})
 
