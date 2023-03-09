@@ -46,6 +46,14 @@ type ServicePod struct {
 	DNSName string `json:"dnsName"`
 }
 
+// IngressGwPod contains ingress gw pod information
+type IngressGwPod struct {
+	// Name of the pod
+	Name string `json:"name"`
+	// NsmIP of the pod which is reachable within slice
+	NsmIP string `json:"nsmIp,omitempty"`
+}
+
 // ServiceExportSpec defines the desired state of ServiceExport
 type ServiceExportSpec struct {
 	// Slice denotes the slice which the app is part of
@@ -56,6 +64,9 @@ type ServiceExportSpec struct {
 	IngressEnabled bool `json:"ingressEnabled,omitempty"`
 	// Ports which should be exposed through the service
 	Ports []ServicePort `json:"ports"`
+	// Alias names for the exported service. The service could be addressed by the alias names
+	// in addition to the slice.local name.
+	Aliases []string `json:"aliases,omitempty"`
 }
 
 // ExportStatus is the status of Service Discovery reconciliation
@@ -97,6 +108,13 @@ type ServiceExportStatus struct {
 	ExposedPorts string `json:"exposedPorts,omitempty"`
 	// AvailableEndpoints shows the number of available endpoints
 	AvailableEndpoints int `json:"availableEndpoints,omitempty"`
+	// IngressGwEnabled denotes ingress gw is enabled for the serviceexport
+	IngressGwEnabled bool `json:"ingressGwEnabled,omitempty"`
+	// IngressGwPod contains ingress gateway pod info
+	IngressGwPod IngressGwPod `json:"ingressGwPod,omitempty"`
+	// Alias names for the exported service. The service could be addressed by the alias names
+	// in addition to the slice.local name.
+	Aliases []string `json:"aliases,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -106,6 +124,7 @@ type ServiceExportStatus struct {
 // +kubebuilder:printcolumn:name="Port(s)",type=string,JSONPath=`.status.exposedPorts`
 // +kubebuilder:printcolumn:name="Endpoints",type=integer,JSONPath=`.status.availableEndpoints`
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.exportStatus`
+// +kubebuilder:printcolumn:name="Alias",type=string,JSONPath=`.spec.aliases`
 // +kubebuilder:resource:path=serviceexports,singular=serviceexport,shortName=svcex
 
 // ServiceExport is the Schema for the serviceexports API
