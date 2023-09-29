@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	caddy.DefaultConfigFile = "Corefile"
+	caddy.DefaultConfigFile = "tmp/Corefile"
 	caddy.Quiet = true // don't show init stuff from caddy
 	setVersion()
 

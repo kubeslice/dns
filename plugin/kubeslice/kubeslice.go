@@ -2,6 +2,7 @@ package kubeslice
 
 import (
 	"context"
+	"errors"
 
 	"github.com/coredns/coredns/plugin/etcd/msg"
 	"github.com/coredns/coredns/request"
@@ -15,6 +16,10 @@ import (
 type Kubeslice struct {
 	Next           plugin.Handler
 	EndpointsCache dnsCache.EndpointsCache
+}
+
+func New() *Kubeslice {
+	return &Kubeslice{}
 }
 
 func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact bool, opt plugin.Options) ([]msg.Service, error) {
@@ -43,6 +48,9 @@ func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact 
 
 			svcs = append(svcs, svc)
 		}
+	}
+	if len(svcs) == 0 {
+		return svcs, errors.New("no records found")
 	}
 
 	return svcs, nil
