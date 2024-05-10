@@ -21,10 +21,23 @@ func (ks Kubeslice) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.M
 	state := request.Request{W: w, Req: r}
 	zone := "slice.local"
 
-	records, truncated, err := plugin.A(ctx, &ks, zone, state, nil, plugin.Options{})
+	var (
+		records, extra []dns.RR
+		truncated      bool
+		err            error
+	)
 
-	if err != nil {
-		return dns.RcodeServerFailure, err
+	switch state.QType() {
+	case dns.TypeA:
+		records, truncated, err = plugin.A(ctx, &ks, zone, state, nil, plugin.Options{})
+		if err != nil {
+			return dns.RcodeServerFailure, err
+		}
+	case dns.TypeSRV:
+		records, extra, err = plugin.SRV(ctx, &ks, zone, state, plugin.Options{})
+		if err != nil {
+			return dns.RcodeServerFailure, err
+		}
 	}
 
 	m := new(dns.Msg)
@@ -32,10 +45,10 @@ func (ks Kubeslice) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.M
 	m.Authoritative = true
 	m.Truncated = truncated
 	m.Answer = records
+	m.Extra = extra
 
 	w.WriteMsg(m)
 	return dns.RcodeSuccess, nil
-
 }
 
 // Name implements the Handler interface.

@@ -2,6 +2,7 @@ package kubeslice
 
 import (
 	"context"
+	"strings"
 
 	dnsCache "github.com/kubeslice/dns/plugin/kubeslice/cache"
 	"github.com/kubeslice/dns/plugin/kubeslice/slice"
@@ -18,6 +19,25 @@ type ServiceImportReconciler struct {
 }
 
 const finalizerName = "networking.kubeslice.io/dns-finalizer"
+
+func getSrvEntries(si *kubeslicev1beta1.ServiceImport, name, ip string) []slice.Endpoint {
+	srvEntries := []slice.Endpoint{}
+	for _, port := range si.Spec.Ports {
+		srvEntry := slice.Endpoint{
+			Host:        "_" + port.Name + "." + "_" + strings.ToLower(string(port.Protocol)) + "." + name,
+			TargetStrip: 2,
+			IP:          ip,
+			Ports: []slice.ServicePort{{
+				Name:     port.Name,
+				Port:     port.ContainerPort,
+				Protocol: string(port.Protocol),
+			}},
+		}
+		srvEntries = append(srvEntries, srvEntry)
+	}
+
+	return srvEntries
+}
 
 // Watch the ServiceImport changes and adjust dns cache accordingly
 func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
@@ -61,23 +81,41 @@ func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.R
 	}
 
 	eps := []slice.Endpoint{}
+	ports := []slice.ServicePort{}
+	for _, port := range si.Spec.Ports {
+		ports = append(ports, slice.ServicePort{
+			Name:     port.Name,
+			Port:     port.ContainerPort,
+			Protocol: string(port.Protocol),
+		})
+	}
 
 	for _, ep := range si.Status.Endpoints {
+		// Add entries for the service dns name
 		endpoint := slice.Endpoint{
-			Host: ep.DNSName,
-			IP:   ep.IP,
+			Host:  ep.DNSName,
+			IP:    ep.IP,
+			Ports: ports,
 		}
 		endpoint2 := slice.Endpoint{
-			Host: si.Spec.DNSName,
-			IP:   ep.IP,
+			Host:  si.Spec.DNSName,
+			IP:    ep.IP,
+			Ports: ports,
 		}
 		eps = append(eps, endpoint, endpoint2)
+		// Add port number entries for SRV records
+		eps = append(eps, getSrvEntries(si, si.Spec.DNSName, ep.IP)...)
+
+		// Add entries for aliases for the service
 		for _, alias := range si.Spec.Aliases {
-                        endpointN := slice.Endpoint{
-			       Host: alias,
-			       IP:   ep.IP,
-		        }
-		        eps = append(eps, endpointN)
+			endpointN := slice.Endpoint{
+				Host:  alias,
+				IP:    ep.IP,
+				Ports: ports,
+			}
+			eps = append(eps, endpointN)
+			// Add port number entries for SRV records
+			eps = append(eps, getSrvEntries(si, alias, ep.IP)...)
 		}
 	}
 

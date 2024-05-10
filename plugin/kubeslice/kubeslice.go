@@ -18,35 +18,43 @@ type Kubeslice struct {
 }
 
 func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact bool, opt plugin.Options) ([]msg.Service, error) {
-
 	var svcs []msg.Service
+	name := state.Name()
+	name = name[:len(name)-1]
+	eps := ks.EndpointsCache.GetAll()
 
-	// kubeslice only support A records for now, so return empty list if request is not A
-	if state.QType() != dns.TypeA {
-		log.Debug("received invalid request type, only A is supported now")
+	switch state.QType() {
+	case dns.TypeA:
+		for _, ep := range eps {
+			if ep.Host == name {
+				svc := msg.Service{
+					Host: ep.IP,
+					TTL:  60,
+				}
+				svcs = append(svcs, svc)
+			}
+		}
+	case dns.TypeSRV:
+		for _, ep := range eps {
+			if ep.Host == name {
+				for _, port := range ep.Ports {
+					svc := msg.Service{
+						Host:        ep.IP,
+						TTL:         60,
+						Port:        int(port.Port),
+						Key:         msg.Path(ep.Host, "slice"),
+						TargetStrip: ep.TargetStrip,
+					}
+					svcs = append(svcs, svc)
+				}
+			}
+		}
+	default:
+		log.Debug("received invalid request type, only A and SRV are supported")
 		return svcs, nil
 	}
 
-	log.Info("fetching kubeslice services")
-
-	name := state.Name()
-	name = name[:len(name)-1]
-
-	eps := ks.EndpointsCache.GetAll()
-
-	for _, ep := range eps {
-		if ep.Host == name {
-			svc := msg.Service{
-				Host: ep.IP,
-				TTL:  60,
-			}
-
-			svcs = append(svcs, svc)
-		}
-	}
-
 	return svcs, nil
-
 }
 
 // TODO fill later
