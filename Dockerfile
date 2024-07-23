@@ -19,7 +19,6 @@ FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 
 COPY --from=builder /workspace/coredns .
-COPY Corefile Corefile
 
 USER nonroot:nonroot
 

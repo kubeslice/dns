@@ -1,4 +1,6 @@
 .:1053 {
-  debug
+  log
   kubeslice
+  forward . <ClusterIP of kube-dns>
+  reload 2s
 }
