@@ -10,9 +10,12 @@ COPY main.go main.go
 COPY plugin/ plugin/
 COPY vendor/ vendor/
 
+ARG TARGETPLATFORM
+ARG TARGETARCH
+
 # Build
 RUN go env -w GOPRIVATE=github.org/kubeslice && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -mod=vendor -a -o coredns main.go
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} GO111MODULE=on go build -mod=vendor -a -o coredns main.go
 
 FROM gcr.io/distroless/static:nonroot
 
