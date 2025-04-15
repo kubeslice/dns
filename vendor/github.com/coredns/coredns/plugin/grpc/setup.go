@@ -3,6 +3,7 @@ package grpc
 import (
 	"crypto/tls"
 	"fmt"
+	"path/filepath"
 
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
@@ -96,7 +97,6 @@ func parseStanza(c *caddy.Controller) (*GRPC, error) {
 }
 
 func parseBlock(c *caddy.Controller, g *GRPC) error {
-
 	switch c.Val() {
 	case "except":
 		ignore := c.RemainingArgs()
@@ -112,6 +112,11 @@ func parseBlock(c *caddy.Controller, g *GRPC) error {
 			return c.ArgErr()
 		}
 
+		for i := range args {
+			if !filepath.IsAbs(args[i]) && dnsserver.GetConfig(c).Root != "" {
+				args[i] = filepath.Join(dnsserver.GetConfig(c).Root, args[i])
+			}
+		}
 		tlsConfig, err := pkgtls.NewTLSConfigFromArgs(args...)
 		if err != nil {
 			return err

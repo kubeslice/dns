@@ -8,16 +8,18 @@ import (
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/plugin/pkg/log"
+
+	"k8s.io/utils/strings/slices"
 )
 
 func setup(c *caddy.Controller) error {
-
 	config := dnsserver.GetConfig(c)
 	// addresses will be consolidated over all BIND directives available in that BlocServer
 	all := []string{}
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return plugin.Error("bind", fmt.Errorf("failed to get interfaces list: %s", err))
+		log.Warning(plugin.Error("bind", fmt.Errorf("failed to get interfaces list, cannot bind by interface name: %s", err)))
 	}
 
 	for c.Next() {
@@ -37,7 +39,7 @@ func setup(c *caddy.Controller) error {
 		}
 
 		for _, ip := range ips {
-			if !isIn(ip, except) {
+			if !slices.Contains(except, ip) {
 				all = append(all, ip)
 			}
 		}
@@ -97,15 +99,4 @@ func listIP(args []string, ifaces []net.Interface) ([]string, error) {
 		}
 	}
 	return all, nil
-}
-
-// isIn checks if a string array contains an element
-func isIn(s string, list []string) bool {
-	is := false
-	for _, l := range list {
-		if s == l {
-			is = true
-		}
-	}
-	return is
 }

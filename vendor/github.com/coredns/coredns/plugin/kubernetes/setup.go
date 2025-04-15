@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -15,11 +14,10 @@ import (
 	clog "github.com/coredns/coredns/plugin/pkg/log"
 	"github.com/coredns/coredns/plugin/pkg/upstream"
 
+	"github.com/go-logr/logr"
 	"github.com/miekg/dns"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"       // pull this in here, because we want it excluded if plugin.cfg doesn't have k8s
-	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"      // pull this in here, because we want it excluded if plugin.cfg doesn't have k8s
-	_ "k8s.io/client-go/plugin/pkg/client/auth/openstack" // pull this in here, because we want it excluded if plugin.cfg doesn't have k8s
+	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc" // pull this in here, because we want it excluded if plugin.cfg doesn't have k8s
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
@@ -32,7 +30,7 @@ func init() { plugin.Register(pluginName, setup) }
 
 func setup(c *caddy.Controller) error {
 	// Do not call klog.InitFlags(nil) here.  It will cause reload to panic.
-	klog.SetOutput(os.Stdout)
+	klog.SetLogger(logr.New(&loggerAdapter{log}))
 
 	k, err := kubernetesParse(c)
 	if err != nil {
@@ -87,7 +85,6 @@ func kubernetesParse(c *caddy.Controller) (*Kubernetes, error) {
 
 // ParseStanza parses a kubernetes stanza
 func ParseStanza(c *caddy.Controller) (*Kubernetes, error) {
-
 	k8s := New([]string{""})
 	k8s.autoPathSearch = searchFromResolvConf()
 

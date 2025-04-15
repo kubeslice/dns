@@ -45,17 +45,24 @@ func setup(c *caddy.Controller) error {
 		if err != nil {
 			return err
 		}
+		if err := a.Notify(); err != nil {
+			log.Warning(err)
+		}
 		if a.loader.ReloadInterval == 0 {
 			return nil
 		}
 		go func() {
 			ticker := time.NewTicker(a.loader.ReloadInterval)
+			defer ticker.Stop()
 			for {
 				select {
 				case <-walkChan:
 					return
 				case <-ticker.C:
 					a.Walk()
+					if err := a.Notify(); err != nil {
+						log.Warning(err)
+					}
 				}
 			}
 		}()

@@ -23,13 +23,13 @@ func A(ctx context.Context, b ServiceBackend, zone string, state request.Request
 	dup := make(map[string]struct{})
 
 	for _, serv := range services {
-
 		what, ip := serv.HostType()
 
 		switch what {
 		case dns.TypeCNAME:
 			if Name(state.Name()).Matches(dns.Fqdn(serv.Host)) {
 				// x CNAME x is a direct loop, don't add those
+				// in etcd/skydns w.x CNAME x is also direct loop due to the "recursive" nature of search results
 				continue
 			}
 
@@ -96,7 +96,6 @@ func AAAA(ctx context.Context, b ServiceBackend, zone string, state request.Requ
 	dup := make(map[string]struct{})
 
 	for _, serv := range services {
-
 		what, ip := serv.HostType()
 
 		switch what {
@@ -104,6 +103,7 @@ func AAAA(ctx context.Context, b ServiceBackend, zone string, state request.Requ
 			// Try to resolve as CNAME if it's not an IP, but only if we don't create loops.
 			if Name(state.Name()).Matches(dns.Fqdn(serv.Host)) {
 				// x CNAME x is a direct loop, don't add those
+				// in etcd/skydns w.x CNAME x is also direct loop due to the "recursive" nature of search results
 				continue
 			}
 
@@ -342,8 +342,7 @@ func CNAME(ctx context.Context, b ServiceBackend, zone string, state request.Req
 
 // TXT returns TXT records from Backend or an error.
 func TXT(ctx context.Context, b ServiceBackend, zone string, state request.Request, previousRecords []dns.RR, opt Options) (records []dns.RR, truncated bool, err error) {
-
-	services, err := b.Services(ctx, state, true, opt)
+	services, err := b.Services(ctx, state, false, opt)
 	if err != nil {
 		return nil, false, err
 	}
@@ -351,13 +350,13 @@ func TXT(ctx context.Context, b ServiceBackend, zone string, state request.Reque
 	dup := make(map[string]struct{})
 
 	for _, serv := range services {
-
 		what, _ := serv.HostType()
 
 		switch what {
 		case dns.TypeCNAME:
 			if Name(state.Name()).Matches(dns.Fqdn(serv.Host)) {
 				// x CNAME x is a direct loop, don't add those
+				// in etcd/skydns w.x CNAME x is also direct loop due to the "recursive" nature of search results
 				continue
 			}
 
@@ -398,11 +397,10 @@ func TXT(ctx context.Context, b ServiceBackend, zone string, state request.Reque
 			continue
 
 		case dns.TypeTXT:
-			if _, ok := dup[serv.Host]; !ok {
-				dup[serv.Host] = struct{}{}
-				return append(records, serv.NewTXT(state.QName())), truncated, nil
+			if _, ok := dup[serv.Text]; !ok {
+				dup[serv.Text] = struct{}{}
+				records = append(records, serv.NewTXT(state.QName()))
 			}
-
 		}
 	}
 
@@ -504,7 +502,6 @@ func BackendError(ctx context.Context, b ServiceBackend, zone string, rcode int,
 }
 
 func newAddress(s msg.Service, name string, ip net.IP, what uint16) dns.RR {
-
 	hdr := dns.RR_Header{Name: name, Rrtype: what, Class: dns.ClassINET, Ttl: s.TTL}
 
 	if what == dns.TypeA {
