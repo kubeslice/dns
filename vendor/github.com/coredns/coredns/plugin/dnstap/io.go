@@ -1,6 +1,7 @@
 package dnstap
 
 import (
+	"crypto/tls"
 	"net"
 	"sync/atomic"
 	"time"
@@ -14,45 +15,67 @@ const (
 
 	tcpTimeout   = 4 * time.Second
 	flushTimeout = 1 * time.Second
+
+	skipVerify = false // by default, every tls connection is verified to be secure
 )
 
 // tapper interface is used in testing to mock the Dnstap method.
 type tapper interface {
-	Dnstap(tap.Dnstap)
+	Dnstap(*tap.Dnstap)
 }
 
 // dio implements the Tapper interface.
 type dio struct {
-	endpoint     string
-	proto        string
-	conn         net.Conn
-	enc          *encoder
-	queue        chan tap.Dnstap
-	dropped      uint32
-	quit         chan struct{}
-	flushTimeout time.Duration
-	tcpTimeout   time.Duration
+	endpoint        string
+	proto           string
+	enc             *encoder
+	queue           chan *tap.Dnstap
+	dropped         uint32
+	quit            chan struct{}
+	flushTimeout    time.Duration
+	tcpTimeout      time.Duration
+	skipVerify      bool
+	tcpWriteBufSize int
 }
 
 // newIO returns a new and initialized pointer to a dio.
-func newIO(proto, endpoint string) *dio {
+func newIO(proto, endpoint string, multipleQueue int, multipleTcpWriteBuf int) *dio {
 	return &dio{
-		endpoint:     endpoint,
-		proto:        proto,
-		queue:        make(chan tap.Dnstap, queueSize),
-		quit:         make(chan struct{}),
-		flushTimeout: flushTimeout,
-		tcpTimeout:   tcpTimeout,
+		endpoint:        endpoint,
+		proto:           proto,
+		queue:           make(chan *tap.Dnstap, multipleQueue*queueSize),
+		quit:            make(chan struct{}),
+		flushTimeout:    flushTimeout,
+		tcpTimeout:      tcpTimeout,
+		skipVerify:      skipVerify,
+		tcpWriteBufSize: multipleTcpWriteBuf * tcpWriteBufSize,
 	}
 }
 
 func (d *dio) dial() error {
-	conn, err := net.DialTimeout(d.proto, d.endpoint, d.tcpTimeout)
-	if err != nil {
-		return err
+	var conn net.Conn
+	var err error
+
+	if d.proto == "tls" {
+		config := &tls.Config{
+			InsecureSkipVerify: d.skipVerify,
+		}
+		dialer := &net.Dialer{
+			Timeout: d.tcpTimeout,
+		}
+		conn, err = tls.DialWithDialer(dialer, "tcp", d.endpoint, config)
+		if err != nil {
+			return err
+		}
+	} else {
+		conn, err = net.DialTimeout(d.proto, d.endpoint, d.tcpTimeout)
+		if err != nil {
+			return err
+		}
 	}
+
 	if tcpConn, ok := conn.(*net.TCPConn); ok {
-		tcpConn.SetWriteBuffer(tcpWriteBufSize)
+		tcpConn.SetWriteBuffer(d.tcpWriteBufSize)
 		tcpConn.SetNoDelay(false)
 	}
 
@@ -68,7 +91,7 @@ func (d *dio) connect() error {
 }
 
 // Dnstap enqueues the payload for log.
-func (d *dio) Dnstap(payload tap.Dnstap) {
+func (d *dio) Dnstap(payload *tap.Dnstap) {
 	select {
 	case d.queue <- payload:
 	default:
@@ -105,7 +128,7 @@ func (d *dio) serve() {
 			d.enc.close()
 			return
 		case payload := <-d.queue:
-			if err := d.write(&payload); err != nil {
+			if err := d.write(payload); err != nil {
 				d.dial()
 			}
 		case <-timeout.C:

@@ -65,6 +65,14 @@ type SliceGatewayConfig struct {
 	SliceGatewayRemoteGatewayID string `json:"sliceGatewayRemoteGatewayId,omitempty"`
 	// Remote Cluster ID
 	SliceGatewayRemoteClusterID string `json:"sliceGatewayRemoteClusterId,omitempty"`
+	// Intermediate Slice Gw Deployments
+	SliceGatewayIntermediateDeployments []string `json:"sliceGatewayIntermediateDeployments,omitempty"`
+	// SliceGateway Connectivity Type
+	SliceGatewayConnectivityType string `json:"sliceGatewayConnectivityType,omitempty"`
+	// SliceGateway Protocol Type: UDP or TCP
+	SliceGatewayProtocol string `json:"sliceGatewayProtocol,omitempty"`
+	// Slice gateway server LB IPs
+	SliceGatewayServerLBIPs []string `json:"sliceGatewayServerLBIps,omitempty"`
 }
 
 // SliceGatewayStatus defines the observed state of SliceGateway
@@ -116,12 +124,16 @@ type SliceGatewayList struct {
 }
 
 type GwPodInfo struct {
-	PodName      string       `json:"podName,omitempty"`
-	PeerPodName  string       `json:"peerPodName,omitempty"`
-	PodIP        string       `json:"podIP,omitempty"`
-	LocalNsmIP   string       `json:"localNsmIP,omitempty"`
-	TunnelStatus TunnelStatus `json:"tunnelStatus,omitempty"`
-	RouteRemoved int32        `json:"routeRemoved,omitempty"`
+	PodName string `json:"podName,omitempty"`
+	// podCreationTS indicates the creation TS of a pod
+	PodCreationTS *metav1.Time `json:"podCreationTS,omitempty"`
+	// originalPodCreationTS indicates how old the gw pod is even if is restarted
+	OriginalPodCreationTS *metav1.Time `json:"originalPodCreationTS,omitempty"`
+	PeerPodName           string       `json:"peerPodName,omitempty"`
+	PodIP                 string       `json:"podIP,omitempty"`
+	LocalNsmIP            string       `json:"localNsmIP,omitempty"`
+	TunnelStatus          TunnelStatus `json:"tunnelStatus,omitempty"`
+	RouteRemoved          int32        `json:"routeRemoved,omitempty"`
 }
 type TunnelStatus struct {
 	IntfName   string `json:"IntfName,omitempty"`

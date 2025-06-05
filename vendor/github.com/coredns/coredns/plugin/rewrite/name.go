@@ -92,7 +92,7 @@ type nameRewriterResponseRule struct {
 	stringRewriter
 }
 
-func (r *nameRewriterResponseRule) RewriteResponse(rr dns.RR) {
+func (r *nameRewriterResponseRule) RewriteResponse(res *dns.Msg, rr dns.RR) {
 	rr.Header().Name = r.rewriteString(rr.Header().Name)
 }
 
@@ -101,7 +101,7 @@ type valueRewriterResponseRule struct {
 	stringRewriter
 }
 
-func (r *valueRewriterResponseRule) RewriteResponse(rr dns.RR) {
+func (r *valueRewriterResponseRule) RewriteResponse(res *dns.Msg, rr dns.RR) {
 	value := getRecordValueForRewrite(rr)
 	if value != "" {
 		new := r.rewriteString(value)
@@ -367,7 +367,6 @@ func parseAnswerRules(name string, args []string) (auto bool, rules ResponseRule
 		if last == "" && args[arg] != AnswerMatch {
 			if last == "" {
 				return false, nil, fmt.Errorf("exceeded the number of arguments for a non-answer rule argument for %s rule", name)
-
 			}
 			return false, nil, fmt.Errorf("exceeded the number of arguments for %s answer rule for %s rule", last, name)
 		}

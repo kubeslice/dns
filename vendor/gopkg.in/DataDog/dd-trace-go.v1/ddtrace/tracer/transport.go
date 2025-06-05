@@ -11,12 +11,13 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	pb "github.com/DataDog/datadog-agent/pkg/proto/pbgo/trace"
 
 	traceinternal "gopkg.in/DataDog/dd-trace-go.v1/ddtrace/internal"
 	"gopkg.in/DataDog/dd-trace-go.v1/internal"
@@ -37,26 +38,29 @@ var defaultDialer = &net.Dialer{
 	DualStack: true,
 }
 
-var defaultClient = &http.Client{
-	// We copy the transport to avoid using the default one, as it might be
-	// augmented with tracing and we don't want these calls to be recorded.
-	// See https://golang.org/pkg/net/http/#DefaultTransport .
-	Transport: &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
-		DialContext:           defaultDialer.DialContext,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	},
-	Timeout: defaultHTTPTimeout,
+func defaultHTTPClient(timeout time.Duration) *http.Client {
+	if timeout == 0 {
+		timeout = defaultHTTPTimeout
+	}
+	return &http.Client{
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           defaultDialer.DialContext,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+		Timeout: timeout,
+	}
 }
 
 const (
 	defaultHostname    = "localhost"
 	defaultPort        = "8126"
 	defaultAddress     = defaultHostname + ":" + defaultPort
-	defaultHTTPTimeout = 2 * time.Second         // defines the current timeout before giving up with the send process
+	defaultURL         = "http://" + defaultAddress
+	defaultHTTPTimeout = 10 * time.Second        // defines the current timeout before giving up with the send process
 	traceCountHeader   = "X-Datadog-Trace-Count" // header containing the number of traces in the payload
 )
 
@@ -66,7 +70,7 @@ type transport interface {
 	// It returns a non-nil response body when no error occurred.
 	send(p *payload) (body io.ReadCloser, err error)
 	// sendStats sends the given stats payload to the agent.
-	sendStats(s *statsPayload) error
+	sendStats(s *pb.ClientStatsPayload) error
 	// endpoint returns the URL to which the transport will send traces.
 	endpoint() string
 }
@@ -79,16 +83,13 @@ type httpTransport struct {
 }
 
 // newTransport returns a new Transport implementation that sends traces to a
-// trace agent running on the given hostname and port, using a given
-// *http.Client. If the zero values for hostname and port are provided,
-// the default values will be used ("localhost" for hostname, and "8126" for
-// port). If client is nil, a default is used.
+// trace agent at the given url, using a given *http.Client.
 //
 // In general, using this method is only necessary if you have a trace agent
 // running on a non-default port, if it's located on another machine, or when
 // otherwise needing to customize the transport layer, for instance when using
 // a unix domain socket.
-func newHTTPTransport(addr string, client *http.Client) *httpTransport {
+func newHTTPTransport(url string, client *http.Client) *httpTransport {
 	// initialize the default EncoderPool with Encoder headers
 	defaultHeaders := map[string]string{
 		"Datadog-Meta-Lang":             "go",
@@ -100,15 +101,21 @@ func newHTTPTransport(addr string, client *http.Client) *httpTransport {
 	if cid := internal.ContainerID(); cid != "" {
 		defaultHeaders["Datadog-Container-ID"] = cid
 	}
+	if eid := internal.EntityID(); eid != "" {
+		defaultHeaders["Datadog-Entity-ID"] = eid
+	}
+	if extEnv := internal.ExternalEnvironment(); extEnv != "" {
+		defaultHeaders["Datadog-External-Env"] = extEnv
+	}
 	return &httpTransport{
-		traceURL: fmt.Sprintf("http://%s/v0.4/traces", resolveAgentAddr(addr)),
-		statsURL: fmt.Sprintf("http://%s/v0.6/stats", resolveAgentAddr(addr)),
+		traceURL: fmt.Sprintf("%s/v0.4/traces", url),
+		statsURL: fmt.Sprintf("%s/v0.6/stats", url),
 		client:   client,
 		headers:  defaultHeaders,
 	}
 }
 
-func (t *httpTransport) sendStats(p *statsPayload) error {
+func (t *httpTransport) sendStats(p *pb.ClientStatsPayload) error {
 	var buf bytes.Buffer
 	if err := msgp.Encode(&buf, p); err != nil {
 		return err
@@ -116,6 +123,9 @@ func (t *httpTransport) sendStats(p *statsPayload) error {
 	req, err := http.NewRequest("POST", t.statsURL, &buf)
 	if err != nil {
 		return err
+	}
+	for header, value := range t.headers {
+		req.Header.Set(header, value)
 	}
 	resp, err := t.client.Do(req)
 	if err != nil {
@@ -141,20 +151,26 @@ func (t *httpTransport) send(p *payload) (body io.ReadCloser, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot create http request: %v", err)
 	}
+	req.ContentLength = int64(p.size())
 	for header, value := range t.headers {
 		req.Header.Set(header, value)
 	}
 	req.Header.Set(traceCountHeader, strconv.Itoa(p.itemCount()))
-	req.Header.Set("Content-Length", strconv.Itoa(p.size()))
 	req.Header.Set(headerComputedTopLevel, "yes")
-	if t, ok := traceinternal.GetGlobalTracer().(*tracer); ok {
-		if t.config.canComputeStats() {
+	var tr *tracer
+	var haveTracer bool
+	if tr, haveTracer = traceinternal.GetGlobalTracer().(*tracer); haveTracer {
+		if tr.config.tracingAsTransport || tr.config.canComputeStats() {
+			// tracingAsTransport uses this header to disable the trace agent's stats computation
+			// while making canComputeStats() always false to also disable client stats computation.
 			req.Header.Set("Datadog-Client-Computed-Stats", "yes")
 		}
-		droppedTraces := int(atomic.SwapUint64(&t.droppedP0Traces, 0))
-		droppedSpans := int(atomic.SwapUint64(&t.droppedP0Spans, 0))
-		if stats := t.config.statsd; stats != nil {
-			stats.Count("datadog.tracer.dropped_p0_traces", int64(droppedTraces), nil, 1)
+		droppedTraces := int(atomic.SwapUint32(&tr.droppedP0Traces, 0))
+		partialTraces := int(atomic.SwapUint32(&tr.partialTraces, 0))
+		droppedSpans := int(atomic.SwapUint32(&tr.droppedP0Spans, 0))
+		if stats := tr.statsd; stats != nil {
+			stats.Count("datadog.tracer.dropped_p0_traces", int64(droppedTraces),
+				[]string{fmt.Sprintf("partial:%s", strconv.FormatBool(partialTraces > 0))}, 1)
 			stats.Count("datadog.tracer.dropped_p0_spans", int64(droppedSpans), nil, 1)
 		}
 		req.Header.Set("Datadog-Client-Dropped-P0-Traces", strconv.Itoa(droppedTraces))
@@ -162,9 +178,11 @@ func (t *httpTransport) send(p *payload) (body io.ReadCloser, err error) {
 	}
 	response, err := t.client.Do(req)
 	if err != nil {
+		reportAPIErrorsMetric(haveTracer, response, err, tr)
 		return nil, err
 	}
 	if code := response.StatusCode; code >= 400 {
+		reportAPIErrorsMetric(haveTracer, response, err, tr)
 		// error, check the body for context information and
 		// return a nice error.
 		msg := make([]byte, 1000)
@@ -179,30 +197,20 @@ func (t *httpTransport) send(p *payload) (body io.ReadCloser, err error) {
 	return response.Body, nil
 }
 
-func (t *httpTransport) endpoint() string {
-	return t.traceURL
+func reportAPIErrorsMetric(haveTracer bool, response *http.Response, err error, t *tracer) {
+	if !haveTracer {
+		return
+	}
+	var reason string
+	if err != nil {
+		reason = "network_failure"
+	}
+	if response != nil {
+		reason = fmt.Sprintf("server_response_%d", response.StatusCode)
+	}
+	t.statsd.Incr("datadog.tracer.api.errors", []string{"reason:" + reason}, 1)
 }
 
-// resolveAgentAddr resolves the given agent address and fills in any missing host
-// and port using the defaults. Some environment variable settings will
-// take precedence over configuration.
-func resolveAgentAddr(addr string) string {
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		// no port in addr
-		host = addr
-	}
-	if host == "" {
-		host = defaultHostname
-	}
-	if port == "" {
-		port = defaultPort
-	}
-	if v := os.Getenv("DD_AGENT_HOST"); v != "" {
-		host = v
-	}
-	if v := os.Getenv("DD_TRACE_AGENT_PORT"); v != "" {
-		port = v
-	}
-	return fmt.Sprintf("%s:%s", host, port)
+func (t *httpTransport) endpoint() string {
+	return t.traceURL
 }

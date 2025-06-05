@@ -109,6 +109,13 @@ func rwMap(dst jsWriter, src *Reader) (n int, err error) {
 		return dst.WriteString("{}")
 	}
 
+	// This is potentially a recursive call.
+	if done, err := src.recursiveCall(); err != nil {
+		return 0, err
+	} else {
+		defer done()
+	}
+
 	err = dst.WriteByte('{')
 	if err != nil {
 		return
@@ -162,6 +169,13 @@ func rwArray(dst jsWriter, src *Reader) (n int, err error) {
 	if err != nil {
 		return
 	}
+	// This is potentially a recursive call.
+	if done, err := src.recursiveCall(); err != nil {
+		return 0, err
+	} else {
+		defer done()
+	}
+
 	var sz uint32
 	var nn int
 	sz, err = src.ReadArrayHeader()
@@ -206,7 +220,7 @@ func rwFloat32(dst jsWriter, src *Reader) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	src.scratch = strconv.AppendFloat(src.scratch[:0], float64(f), 'f', -1, 64)
+	src.scratch = strconv.AppendFloat(src.scratch[:0], float64(f), 'f', -1, 32)
 	return dst.Write(src.scratch)
 }
 
@@ -215,7 +229,7 @@ func rwFloat64(dst jsWriter, src *Reader) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	src.scratch = strconv.AppendFloat(src.scratch[:0], f, 'f', -1, 32)
+	src.scratch = strconv.AppendFloat(src.scratch[:0], f, 'f', -1, 64)
 	return dst.Write(src.scratch)
 }
 

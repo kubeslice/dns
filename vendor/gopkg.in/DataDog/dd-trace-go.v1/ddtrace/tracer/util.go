@@ -6,7 +6,6 @@
 package tracer
 
 import (
-	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
@@ -21,6 +20,8 @@ import (
 func toFloat64(value interface{}) (f float64, ok bool) {
 	const max = (int64(1) << 53) - 1
 	const min = -max
+	// If any other type is added here, remember to add it to the type switch in
+	// the `span.SetTag` function to handle pointers to these supported types.
 	switch i := value.(type) {
 	case byte:
 		return float64(i), true
@@ -72,7 +73,7 @@ func parseUint64(str string) (uint64, error) {
 	return strconv.ParseUint(str, 10, 64)
 }
 
-func isValidPropagatableTraceTag(k, v string) error {
+func isValidPropagatableTag(k, v string) error {
 	if len(k) == 0 {
 		return fmt.Errorf("key length must be greater than zero")
 	}
@@ -85,7 +86,7 @@ func isValidPropagatableTraceTag(k, v string) error {
 		return fmt.Errorf("value length must be greater than zero")
 	}
 	for _, ch := range v {
-		if ch < 32 || ch > 126 || ch == '=' || ch == ',' {
+		if ch < 32 || ch > 126 || ch == ',' {
 			return fmt.Errorf("value contains an invalid character %d", ch)
 		}
 	}
@@ -102,11 +103,13 @@ func parsePropagatableTraceTags(s string) (map[string]string, error) {
 	for i, ch := range s {
 		switch ch {
 		case '=':
-			if !searchingKey || i-start == 0 {
-				return nil, fmt.Errorf("invalid format")
+			if searchingKey {
+				if i-start == 0 {
+					return nil, fmt.Errorf("invalid format")
+				}
+				key = s[start:i]
+				searchingKey, start = false, i+1
 			}
-			key = s[start:i]
-			searchingKey, start = false, i+1
 		case ',':
 			if searchingKey || i-start == 0 {
 				return nil, fmt.Errorf("invalid format")
@@ -122,8 +125,53 @@ func parsePropagatableTraceTags(s string) (map[string]string, error) {
 	return tags, nil
 }
 
-var b64 = base64.StdEncoding.WithPadding(base64.NoPadding)
+func dereference(value any) any {
+	// Falling into one of the cases will dereference the pointer and return the
+	// value of the pointer. It adds one allocation due to casting.
+	switch value.(type) {
+	case *bool:
+		return dereferenceGeneric(value.(*bool))
+	case *string:
+		return dereferenceGeneric(value.(*string))
+	// Supported type by toFloat64
+	case *byte:
+		return dereferenceGeneric(value.(*byte))
+	case *float32:
+		return dereferenceGeneric(value.(*float32))
+	case *float64:
+		return dereferenceGeneric(value.(*float64))
+	case *int:
+		return dereferenceGeneric(value.(*int))
+	case *int8:
+		return dereferenceGeneric(value.(*int8))
+	case *int16:
+		return dereferenceGeneric(value.(*int16))
+	case *int32:
+		return dereferenceGeneric(value.(*int32))
+	case *int64:
+		return dereferenceGeneric(value.(*int64))
+	case *uint:
+		return dereferenceGeneric(value.(*uint))
+	case *uint16:
+		return dereferenceGeneric(value.(*uint16))
+	case *uint32:
+		return dereferenceGeneric(value.(*uint32))
+	case *uint64:
+		return dereferenceGeneric(value.(*uint64))
+	case *samplernames.SamplerName:
+		v := value.(*samplernames.SamplerName)
+		if v == nil {
+			return samplernames.Unknown
+		}
+		return *v
+	}
+	return value
+}
 
-func b64Encode(s string) string {
-	return b64.EncodeToString([]byte(s))
+func dereferenceGeneric[T any](value *T) T {
+	if value == nil {
+		var v T
+		return v
+	}
+	return *value
 }

@@ -17,15 +17,14 @@ limitations under the License.
 # Zipkin Library for Go
 
 [![GHA](https://github.com/openzipkin/zipkin-go/actions/workflows/ci.yml/badge.svg?event=push)](https://github.com/openzipkin/zipkin-go/actions/workflows/ci.yml)
-[![CircleCI](https://circleci.com/gh/openzipkin/zipkin-go.svg?style=shield)](https://circleci.com/gh/openzipkin/zipkin-go)
 [![codecov](https://codecov.io/gh/openzipkin/zipkin-go/branch/master/graph/badge.svg?token=gXdWofFlsq)](https://codecov.io/gh/openzipkin/zipkin-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/openzipkin/zipkin-go)](https://goreportcard.com/report/github.com/openzipkin/zipkin-go)
 [![GoDoc](https://godoc.org/github.com/openzipkin/zipkin-go?status.svg)](https://godoc.org/github.com/openzipkin/zipkin-go)
 [![Gitter chat](https://badges.gitter.im/openzipkin/zipkin.svg)](https://gitter.im/openzipkin/zipkin?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Sourcegraph](https://sourcegraph.com/github.com/openzipkin/zipkin-go/-/badge.svg)](https://sourcegraph.com/github.com/openzipkin/zipkin-go?badge)
 
-Zipkin Go is the official Go Tracer / Tracing implementation for Zipkin, supported by the
-OpenZipkin community.
+Zipkin Go is the official Go Tracer / Tracing implementation for Zipkin, 
+supported by the OpenZipkin community.
 
 ## package organization
 `zipkin-go` is built with interoperability in mind within the OpenZipkin
@@ -70,8 +69,8 @@ For convenience `NewClient` is provided which returns a HTTP Client which embeds
 calling the `DoWithAppSpan()` method.
 
 #### grpc
-Easy to use grpc.StatsHandler middleware are provided for tracing gRPC server and
-client requests. 
+Easy to use grpc.StatsHandler middleware are provided for tracing gRPC server
+and client requests. 
 
 For a server, pass `NewServerHandler` when calling `NewServer`, e.g.,
 
@@ -110,8 +109,20 @@ backend asynchronously.
 #### Kafka Reporter
 High performance Reporter transporting Spans to the Zipkin server using a Kafka
 Producer digesting JSON V2 Spans. The reporter uses the
-[Sarama async producer](https://godoc.org/github.com/Shopify/sarama#AsyncProducer)
+[Sarama async producer](https://pkg.go.dev/github.com/IBM/sarama#AsyncProducer)
 underneath.
 
-## usage and examples
+## Usage and Examples
 [HTTP Server Example](examples/httpserver_test.go)
+
+## Go Support Policy
+
+zipkin-go follows the same version policy as Go's [Release Policy](https://go.dev/doc/devel/release):
+two versions. zipkin-go will ensure these versions work and bugs are valid if
+there's an issue with a current Go version.
+
+Additionally, zipkin-go intentionally delays usage of language or standard
+library features one additional version. For example, when Go 1.29 is released,
+zipkin-go can use language features or standard libraries added in 1.27. This
+is a convenience for embedders who have a slower version policy than Go.
+However, only supported Go versions may be used to raise support issues.

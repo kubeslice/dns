@@ -12,7 +12,6 @@ import (
 
 	api "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
-	discoveryV1beta1 "k8s.io/api/discovery/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,6 +24,7 @@ const (
 	podIPIndex            = "PodIP"
 	svcNameNamespaceIndex = "ServiceNameNamespace"
 	svcIPIndex            = "ServiceIP"
+	svcExtIPIndex         = "ServiceExternalIP"
 	epNameNamespaceIndex  = "EndpointNameNamespace"
 	epIPIndex             = "EndpointsIP"
 )
@@ -34,6 +34,7 @@ type dnsController interface {
 	EndpointsList() []*object.Endpoints
 	SvcIndex(string) []*object.Service
 	SvcIndexReverse(string) []*object.Service
+	SvcExtIndexReverse(string) []*object.Service
 	PodIndex(string) []*object.Pod
 	EpIndex(string) []*object.Endpoints
 	EpIndexReverse(string) []*object.Endpoints
@@ -63,10 +64,6 @@ type dnsControl struct {
 
 	selector          labels.Selector
 	namespaceSelector labels.Selector
-
-	// epLock is used to lock reads of epLister and epController while they are being replaced
-	// with the api.Endpoints Lister/Controller on k8s systems that don't use discovery.EndpointSlices
-	epLock sync.RWMutex
 
 	svcController cache.Controller
 	podController cache.Controller
@@ -122,36 +119,38 @@ func newdnsController(ctx context.Context, kubeClient kubernetes.Interface, opts
 		},
 		&api.Service{},
 		cache.ResourceEventHandlerFuncs{AddFunc: dns.Add, UpdateFunc: dns.Update, DeleteFunc: dns.Delete},
-		cache.Indexers{svcNameNamespaceIndex: svcNameNamespaceIndexFunc, svcIPIndex: svcIPIndexFunc},
+		cache.Indexers{svcNameNamespaceIndex: svcNameNamespaceIndexFunc, svcIPIndex: svcIPIndexFunc, svcExtIPIndex: svcExtIPIndexFunc},
 		object.DefaultProcessor(object.ToService, nil),
 	)
 
+	podLister, podController := object.NewIndexerInformer(
+		&cache.ListWatch{
+			ListFunc:  podListFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
+			WatchFunc: podWatchFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
+		},
+		&api.Pod{},
+		cache.ResourceEventHandlerFuncs{AddFunc: dns.Add, UpdateFunc: dns.Update, DeleteFunc: dns.Delete},
+		cache.Indexers{podIPIndex: podIPIndexFunc},
+		object.DefaultProcessor(object.ToPod, nil),
+	)
+	dns.podLister = podLister
 	if opts.initPodCache {
-		dns.podLister, dns.podController = object.NewIndexerInformer(
-			&cache.ListWatch{
-				ListFunc:  podListFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
-				WatchFunc: podWatchFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
-			},
-			&api.Pod{},
-			cache.ResourceEventHandlerFuncs{AddFunc: dns.Add, UpdateFunc: dns.Update, DeleteFunc: dns.Delete},
-			cache.Indexers{podIPIndex: podIPIndexFunc},
-			object.DefaultProcessor(object.ToPod, nil),
-		)
+		dns.podController = podController
 	}
 
+	epLister, epController := object.NewIndexerInformer(
+		&cache.ListWatch{
+			ListFunc:  endpointSliceListFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
+			WatchFunc: endpointSliceWatchFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
+		},
+		&discovery.EndpointSlice{},
+		cache.ResourceEventHandlerFuncs{AddFunc: dns.Add, UpdateFunc: dns.Update, DeleteFunc: dns.Delete},
+		cache.Indexers{epNameNamespaceIndex: epNameNamespaceIndexFunc, epIPIndex: epIPIndexFunc},
+		object.DefaultProcessor(object.EndpointSliceToEndpoints, dns.EndpointSliceLatencyRecorder()),
+	)
+	dns.epLister = epLister
 	if opts.initEndpointsCache {
-		dns.epLock.Lock()
-		dns.epLister, dns.epController = object.NewIndexerInformer(
-			&cache.ListWatch{
-				ListFunc:  endpointSliceListFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
-				WatchFunc: endpointSliceWatchFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
-			},
-			&discovery.EndpointSlice{},
-			cache.ResourceEventHandlerFuncs{AddFunc: dns.Add, UpdateFunc: dns.Update, DeleteFunc: dns.Delete},
-			cache.Indexers{epNameNamespaceIndex: epNameNamespaceIndexFunc, epIPIndex: epIPIndexFunc},
-			object.DefaultProcessor(object.EndpointSliceToEndpoints, dns.EndpointSliceLatencyRecorder()),
-		)
-		dns.epLock.Unlock()
+		dns.epController = epController
 	}
 
 	dns.nsLister, dns.nsController = object.NewIndexerInformer(
@@ -166,42 +165,6 @@ func newdnsController(ctx context.Context, kubeClient kubernetes.Interface, opts
 	)
 
 	return &dns
-}
-
-// WatchEndpoints will set the endpoint Lister and Controller to watch object.Endpoints
-// instead of the default discovery.EndpointSlice. This is used in older k8s clusters where
-// discovery.EndpointSlice is not fully supported.
-// This can be removed when all supported k8s versions fully support EndpointSlice.
-func (dns *dnsControl) WatchEndpoints(ctx context.Context) {
-	dns.epLock.Lock()
-	dns.epLister, dns.epController = object.NewIndexerInformer(
-		&cache.ListWatch{
-			ListFunc:  endpointsListFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
-			WatchFunc: endpointsWatchFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
-		},
-		&api.Endpoints{},
-		cache.ResourceEventHandlerFuncs{AddFunc: dns.Add, UpdateFunc: dns.Update, DeleteFunc: dns.Delete},
-		cache.Indexers{epNameNamespaceIndex: epNameNamespaceIndexFunc, epIPIndex: epIPIndexFunc},
-		object.DefaultProcessor(object.ToEndpoints, dns.EndpointsLatencyRecorder()),
-	)
-	dns.epLock.Unlock()
-}
-
-// WatchEndpointSliceV1beta1 will set the endpoint Lister and Controller to watch v1beta1
-// instead of the default v1.
-func (dns *dnsControl) WatchEndpointSliceV1beta1(ctx context.Context) {
-	dns.epLock.Lock()
-	dns.epLister, dns.epController = object.NewIndexerInformer(
-		&cache.ListWatch{
-			ListFunc:  endpointSliceListFuncV1beta1(ctx, dns.client, api.NamespaceAll, dns.selector),
-			WatchFunc: endpointSliceWatchFuncV1beta1(ctx, dns.client, api.NamespaceAll, dns.selector),
-		},
-		&discoveryV1beta1.EndpointSlice{},
-		cache.ResourceEventHandlerFuncs{AddFunc: dns.Add, UpdateFunc: dns.Update, DeleteFunc: dns.Delete},
-		cache.Indexers{epNameNamespaceIndex: epNameNamespaceIndexFunc, epIPIndex: epIPIndexFunc},
-		object.DefaultProcessor(object.EndpointSliceV1beta1ToEndpoints, dns.EndpointSliceLatencyRecorder()),
-	)
-	dns.epLock.Unlock()
 }
 
 func (dns *dnsControl) EndpointsLatencyRecorder() *object.EndpointLatencyRecorder {
@@ -232,12 +195,18 @@ func svcIPIndexFunc(obj interface{}) ([]string, error) {
 	if !ok {
 		return nil, errObj
 	}
-	idx := make([]string, len(svc.ClusterIPs)+len(svc.ExternalIPs))
+	idx := make([]string, len(svc.ClusterIPs))
 	copy(idx, svc.ClusterIPs)
-	if len(svc.ExternalIPs) == 0 {
-		return idx, nil
+	return idx, nil
+}
+
+func svcExtIPIndexFunc(obj interface{}) ([]string, error) {
+	svc, ok := obj.(*object.Service)
+	if !ok {
+		return nil, errObj
 	}
-	copy(idx[len(svc.ClusterIPs):], svc.ExternalIPs)
+	idx := make([]string, len(svc.ExternalIPs))
+	copy(idx, svc.ExternalIPs)
 	return idx, nil
 }
 
@@ -286,14 +255,6 @@ func podListFunc(ctx context.Context, c kubernetes.Interface, ns string, s label
 		return c.CoreV1().Pods(ns).List(ctx, opts)
 	}
 }
-func endpointSliceListFuncV1beta1(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(meta.ListOptions) (runtime.Object, error) {
-	return func(opts meta.ListOptions) (runtime.Object, error) {
-		if s != nil {
-			opts.LabelSelector = s.String()
-		}
-		return c.DiscoveryV1beta1().EndpointSlices(ns).List(ctx, opts)
-	}
-}
 
 func endpointSliceListFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(meta.ListOptions) (runtime.Object, error) {
 	return func(opts meta.ListOptions) (runtime.Object, error) {
@@ -301,15 +262,6 @@ func endpointSliceListFunc(ctx context.Context, c kubernetes.Interface, ns strin
 			opts.LabelSelector = s.String()
 		}
 		return c.DiscoveryV1().EndpointSlices(ns).List(ctx, opts)
-	}
-}
-
-func endpointsListFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(meta.ListOptions) (runtime.Object, error) {
-	return func(opts meta.ListOptions) (runtime.Object, error) {
-		if s != nil {
-			opts.LabelSelector = s.String()
-		}
-		return c.CoreV1().Endpoints(ns).List(ctx, opts)
 	}
 }
 
@@ -344,30 +296,12 @@ func podWatchFunc(ctx context.Context, c kubernetes.Interface, ns string, s labe
 	}
 }
 
-func endpointSliceWatchFuncV1beta1(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(options meta.ListOptions) (watch.Interface, error) {
-	return func(options meta.ListOptions) (watch.Interface, error) {
-		if s != nil {
-			options.LabelSelector = s.String()
-		}
-		return c.DiscoveryV1beta1().EndpointSlices(ns).Watch(ctx, options)
-	}
-}
-
 func endpointSliceWatchFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(options meta.ListOptions) (watch.Interface, error) {
 	return func(options meta.ListOptions) (watch.Interface, error) {
 		if s != nil {
 			options.LabelSelector = s.String()
 		}
 		return c.DiscoveryV1().EndpointSlices(ns).Watch(ctx, options)
-	}
-}
-
-func endpointsWatchFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(options meta.ListOptions) (watch.Interface, error) {
-	return func(options meta.ListOptions) (watch.Interface, error) {
-		if s != nil {
-			options.LabelSelector = s.String()
-		}
-		return c.CoreV1().Endpoints(ns).Watch(ctx, options)
 	}
 }
 
@@ -401,9 +335,7 @@ func (dns *dnsControl) Run() {
 	go dns.svcController.Run(dns.stopCh)
 	if dns.epController != nil {
 		go func() {
-			dns.epLock.RLock()
 			dns.epController.Run(dns.stopCh)
-			dns.epLock.RUnlock()
 		}()
 	}
 	if dns.podController != nil {
@@ -418,9 +350,7 @@ func (dns *dnsControl) HasSynced() bool {
 	a := dns.svcController.HasSynced()
 	b := true
 	if dns.epController != nil {
-		dns.epLock.RLock()
 		b = dns.epController.HasSynced()
-		dns.epLock.RUnlock()
 	}
 	c := true
 	if dns.podController != nil {
@@ -443,8 +373,6 @@ func (dns *dnsControl) ServiceList() (svcs []*object.Service) {
 }
 
 func (dns *dnsControl) EndpointsList() (eps []*object.Endpoints) {
-	dns.epLock.RLock()
-	defer dns.epLock.RUnlock()
 	os := dns.epLister.List()
 	for _, o := range os {
 		ep, ok := o.(*object.Endpoints)
@@ -502,9 +430,23 @@ func (dns *dnsControl) SvcIndexReverse(ip string) (svcs []*object.Service) {
 	return svcs
 }
 
+func (dns *dnsControl) SvcExtIndexReverse(ip string) (svcs []*object.Service) {
+	os, err := dns.svcLister.ByIndex(svcExtIPIndex, ip)
+	if err != nil {
+		return nil
+	}
+
+	for _, o := range os {
+		s, ok := o.(*object.Service)
+		if !ok {
+			continue
+		}
+		svcs = append(svcs, s)
+	}
+	return svcs
+}
+
 func (dns *dnsControl) EpIndex(idx string) (ep []*object.Endpoints) {
-	dns.epLock.RLock()
-	defer dns.epLock.RUnlock()
 	os, err := dns.epLister.ByIndex(epNameNamespaceIndex, idx)
 	if err != nil {
 		return nil
@@ -520,8 +462,6 @@ func (dns *dnsControl) EpIndex(idx string) (ep []*object.Endpoints) {
 }
 
 func (dns *dnsControl) EpIndexReverse(ip string) (ep []*object.Endpoints) {
-	dns.epLock.RLock()
-	defer dns.epLock.RUnlock()
 	os, err := dns.epLister.ByIndex(epIPIndex, ip)
 	if err != nil {
 		return nil
@@ -537,8 +477,8 @@ func (dns *dnsControl) EpIndexReverse(ip string) (ep []*object.Endpoints) {
 }
 
 // GetNodeByName return the node by name. If nothing is found an error is
-// returned. This query causes a roundtrip to the k8s API server, so use
-// sparingly. Currently this is only used for Federation.
+// returned. This query causes a round trip to the k8s API server, so use
+// sparingly. Currently, this is only used for Federation.
 func (dns *dnsControl) GetNodeByName(ctx context.Context, name string) (*api.Node, error) {
 	v1node, err := dns.client.CoreV1().Nodes().Get(ctx, name, meta.GetOptions{})
 	return v1node, err
@@ -581,7 +521,7 @@ func (dns *dnsControl) detectChanges(oldObj, newObj interface{}) {
 			dns.updateModified()
 		}
 		if emod {
-			dns.updateExtModifed()
+			dns.updateExtModified()
 		}
 	case *object.Pod:
 		dns.updateModified()
@@ -725,11 +665,9 @@ func (dns *dnsControl) updateModified() {
 }
 
 // updateExtModified set dns.extModified to the current time.
-func (dns *dnsControl) updateExtModifed() {
+func (dns *dnsControl) updateExtModified() {
 	unix := time.Now().Unix()
 	atomic.StoreInt64(&dns.extModified, unix)
 }
 
 var errObj = errors.New("obj was not of the correct type")
-
-const defaultResyncPeriod = 0

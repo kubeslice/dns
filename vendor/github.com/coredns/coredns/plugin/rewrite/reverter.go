@@ -41,7 +41,7 @@ func NewRevertPolicy(noRevert, noRestore bool) RevertPolicy {
 
 // ResponseRule contains a rule to rewrite a response with.
 type ResponseRule interface {
-	RewriteResponse(rr dns.RR)
+	RewriteResponse(res *dns.Msg, rr dns.RR)
 }
 
 // ResponseRules describes an ordered list of response rules to apply
@@ -90,8 +90,9 @@ func (r *ResponseReverter) WriteMsg(res1 *dns.Msg) error {
 }
 
 func (r *ResponseReverter) rewriteResourceRecord(res *dns.Msg, rr dns.RR) {
-	for _, rule := range r.ResponseRules {
-		rule.RewriteResponse(rr)
+	// The reverting rules need to be done in reversed order.
+	for i := len(r.ResponseRules) - 1; i >= 0; i-- {
+		r.ResponseRules[i].RewriteResponse(res, rr)
 	}
 }
 
@@ -117,6 +118,8 @@ func getRecordValueForRewrite(rr dns.RR) (name string) {
 		return rr.(*dns.NAPTR).Replacement
 	case dns.TypeSOA:
 		return rr.(*dns.SOA).Ns
+	case dns.TypePTR:
+		return rr.(*dns.PTR).Ptr
 	default:
 		return ""
 	}
@@ -138,5 +141,7 @@ func setRewrittenRecordValue(rr dns.RR, value string) {
 		rr.(*dns.NAPTR).Replacement = value
 	case dns.TypeSOA:
 		rr.(*dns.SOA).Ns = value
+	case dns.TypePTR:
+		rr.(*dns.PTR).Ptr = value
 	}
 }

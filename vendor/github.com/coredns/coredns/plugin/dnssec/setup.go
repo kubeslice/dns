@@ -58,7 +58,6 @@ func dnssecParse(c *caddy.Controller) ([]string, []*DNSKEY, int, bool, error) {
 		zones = plugin.OriginsFromArgsOrServerBlock(c.RemainingArgs(), c.ServerBlockKeys)
 
 		for c.NextBlock() {
-
 			switch x := c.Val(); x {
 			case "key":
 				k, e := keyParse(c)
@@ -79,7 +78,6 @@ func dnssecParse(c *caddy.Controller) ([]string, []*DNSKEY, int, bool, error) {
 			default:
 				return nil, nil, 0, false, c.Errf("unknown property '%s'", x)
 			}
-
 		}
 	}
 	// Check if we have both KSKs and ZSKs.
@@ -138,6 +136,19 @@ func keyParse(c *caddy.Controller) ([]*DNSKEY, error) {
 				base = filepath.Join(config.Root, base)
 			}
 			k, err := ParseKeyFile(base+".key", base+".private")
+			if err != nil {
+				return nil, err
+			}
+			keys = append(keys, k)
+		}
+	} else if value == "aws_secretsmanager" {
+		ks := c.RemainingArgs()
+		if len(ks) == 0 {
+			return nil, c.ArgErr()
+		}
+
+		for _, k := range ks {
+			k, err := ParseKeyFromAWSSecretsManager(k)
 			if err != nil {
 				return nil, err
 			}
