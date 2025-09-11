@@ -2,6 +2,7 @@ package kubeslice
 
 import (
 	"context"
+	"time"
 
 	"github.com/coredns/coredns/plugin/etcd/msg"
 	"github.com/coredns/coredns/request"
@@ -18,21 +19,46 @@ type Kubeslice struct {
 }
 
 func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact bool, opt plugin.Options) ([]msg.Service, error) {
+	startTime := time.Now()
+	queryName := state.Name()
+	
+	log.Info("Services method called", "name", queryName, "exact", exact, "timestamp", startTime)
 
 	var svcs []msg.Service
 
 	// kubeslice only support A records for now, so return empty list if request is not A
 	if state.QType() != dns.TypeA {
-		log.Debug("received invalid request type, only A is supported now")
+		log.Debug("received invalid request type, only A is supported now", "type", state.QType())
 		return svcs, nil
 	}
 
-	log.Info("fetching kubeslice services")
-
-	name := state.Name()
-	name = name[:len(name)-1]
-
+	// Time cache access
+	cacheStart := time.Now()
 	eps := ks.EndpointsCache.GetAll()
+	cacheDuration := time.Since(cacheStart)
+	
+	// Get cache statistics
+	cacheStats := ks.EndpointsCache.GetStats()
+	
+	log.Info("Cache access completed", 
+		"name", queryName,
+		"cache_duration_ms", cacheDuration.Milliseconds(),
+		"total_endpoints", len(eps),
+		"cache_hits", cacheStats.Hits,
+		"cache_misses", cacheStats.Misses,
+		"cache_puts", cacheStats.Puts,
+		"cache_deletes", cacheStats.Deletes,
+		"total_keys", cacheStats.TotalKeys,
+		"last_access", cacheStats.LastAccess)
+
+	// Time the matching logic
+	matchStart := time.Now()
+	name := queryName
+	if len(name) > 0 && name[len(name)-1] == '.' {
+		name = name[:len(name)-1]
+	}
+	
+	log.Debug("Looking for matches", "search_name", name, "total_endpoints", len(eps))
 
 	for _, ep := range eps {
 		if ep.Host == name {
@@ -40,13 +66,23 @@ func (ks *Kubeslice) Services(ctx context.Context, state request.Request, exact 
 				Host: ep.IP,
 				TTL:  60,
 			}
-
 			svcs = append(svcs, svc)
+			log.Debug("Found matching endpoint", "host", ep.Host, "ip", ep.IP)
 		}
 	}
+	
+	matchDuration := time.Since(matchStart)
+	totalDuration := time.Since(startTime)
+	
+	log.Info("Services lookup completed", 
+		"name", queryName,
+		"total_duration_ms", totalDuration.Milliseconds(),
+		"cache_duration_ms", cacheDuration.Milliseconds(),
+		"match_duration_ms", matchDuration.Milliseconds(),
+		"matches_found", len(svcs),
+		"total_endpoints_searched", len(eps))
 
 	return svcs, nil
-
 }
 
 // TODO fill later
