@@ -100,10 +100,16 @@ func newRule(args ...string) (Rule, error) {
 	switch arg0 {
 	case Continue:
 		mode = Continue
+		if len(args) < 2 {
+			return nil, fmt.Errorf("continue rule must begin with a rule type")
+		}
 		ruleType = strings.ToLower(args[1])
 		expectNumArgs = len(args) - 1
 		startArg = 2
 	case Stop:
+		if len(args) < 2 {
+			return nil, fmt.Errorf("stop rule must begin with a rule type")
+		}
 		ruleType = strings.ToLower(args[1])
 		expectNumArgs = len(args) - 1
 		startArg = 2
@@ -133,6 +139,10 @@ func newRule(args ...string) (Rule, error) {
 		return newEdns0Rule(mode, args[startArg:]...)
 	case "ttl":
 		return newTTLRule(mode, args[startArg:]...)
+	case "cname":
+		return newCNAMERule(mode, args[startArg:]...)
+	case "rcode":
+		return newRCodeRule(mode, args[startArg:]...)
 	default:
 		return nil, fmt.Errorf("invalid rule type %q", args[0])
 	}

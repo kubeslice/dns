@@ -11,13 +11,14 @@ import (
 func (e *External) serveApex(state request.Request) (int, error) {
 	m := new(dns.Msg)
 	m.SetReply(state.Req)
+	m.Authoritative = true
 	switch state.QType() {
 	case dns.TypeSOA:
 		m.Answer = []dns.RR{e.soa(state)}
 	case dns.TypeNS:
 		m.Answer = []dns.RR{e.ns(state)}
 
-		addr := e.externalAddrFunc(state)
+		addr := e.externalAddrFunc(state, e.headless)
 		for _, rr := range addr {
 			rr.Header().Ttl = e.ttl
 			rr.Header().Name = dnsutil.Join("ns1", e.apex, state.QName())
@@ -37,6 +38,7 @@ func (e *External) serveSubApex(state request.Request) (int, error) {
 
 	m := new(dns.Msg)
 	m.SetReply(state.Req)
+	m.Authoritative = true
 
 	// base is either dns. of ns1.dns (or another name), if it's longer return nxdomain
 	switch labels := dns.CountLabel(base); labels {
@@ -56,7 +58,7 @@ func (e *External) serveSubApex(state request.Request) (int, error) {
 			return 0, nil
 		}
 
-		addr := e.externalAddrFunc(state)
+		addr := e.externalAddrFunc(state, e.headless)
 		for _, rr := range addr {
 			rr.Header().Ttl = e.ttl
 			rr.Header().Name = state.QName()

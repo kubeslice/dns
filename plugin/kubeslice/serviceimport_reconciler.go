@@ -73,11 +73,11 @@ func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.R
 		}
 		eps = append(eps, endpoint, endpoint2)
 		for _, alias := range si.Spec.Aliases {
-                        endpointN := slice.Endpoint{
-			       Host: alias,
-			       IP:   ep.IP,
-		        }
-		        eps = append(eps, endpointN)
+			endpointN := slice.Endpoint{
+				Host: alias,
+				IP:   ep.IP,
+			}
+			eps = append(eps, endpointN)
 		}
 	}
 

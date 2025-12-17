@@ -1,4 +1,4 @@
-FROM golang:1.22.5 as builder
+FROM golang:1.24.2 AS builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -12,10 +12,11 @@ COPY vendor/ vendor/
 
 ARG TARGETPLATFORM
 ARG TARGETARCH
+ARG TARGETOS
 
 # Build
 RUN go env -w GOPRIVATE=github.org/kubeslice && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} GO111MODULE=on go build -mod=vendor -a -o coredns main.go
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GO111MODULE=on go build -mod=vendor -a -o coredns main.go
 
 FROM gcr.io/distroless/static:nonroot
 

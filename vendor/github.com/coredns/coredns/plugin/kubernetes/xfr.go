@@ -42,7 +42,7 @@ func (k *Kubernetes) Transfer(zone string, serial uint32) (<-chan []dns.RR, erro
 		}
 		ch <- soa
 
-		nsAddrs := k.nsAddrs(false, zone)
+		nsAddrs := k.nsAddrs(false, false, zone)
 		nsHosts := make(map[string]struct{})
 		for _, nsAddr := range nsAddrs {
 			nsHost := nsAddr.Header().Name
@@ -63,7 +63,6 @@ func (k *Kubernetes) Transfer(zone string, serial uint32) (<-chan []dns.RR, erro
 			}
 			svcBase := []string{zonePath, Svc, svc.Namespace, svc.Name}
 			switch svc.Type {
-
 			case api.ServiceTypeClusterIP, api.ServiceTypeNodePort, api.ServiceTypeLoadBalancer:
 				clusterIP := net.ParseIP(svc.ClusterIPs[0])
 				if clusterIP != nil {
@@ -90,7 +89,7 @@ func (k *Kubernetes) Transfer(zone string, serial uint32) (<-chan []dns.RR, erro
 							continue
 						}
 
-						s.Key = strings.Join(append(svcBase, strings.ToLower("_"+string(p.Protocol)), strings.ToLower("_"+string(p.Name))), "/")
+						s.Key = strings.Join(append(svcBase, strings.ToLower("_"+string(p.Protocol)), strings.ToLower("_"+p.Name)), "/")
 
 						ch <- []dns.RR{s.NewSRV(msg.Domain(s.Key), 100)}
 					}
@@ -125,7 +124,7 @@ func (k *Kubernetes) Transfer(zone string, serial uint32) (<-chan []dns.RR, erro
 
 								s.Port = int(p.Port)
 
-								s.Key = strings.Join(append(svcBase, strings.ToLower("_"+string(p.Protocol)), strings.ToLower("_"+string(p.Name))), "/")
+								s.Key = strings.Join(append(svcBase, strings.ToLower("_"+p.Protocol), strings.ToLower("_"+p.Name)), "/")
 								ch <- []dns.RR{s.NewSRV(msg.Domain(s.Key), srvWeight)}
 							}
 						}
