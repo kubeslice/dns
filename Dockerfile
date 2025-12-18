@@ -1,22 +1,26 @@
-FROM golang:1.24.2 AS builder
+# syntax=docker/dockerfile:1.4
+FROM --platform=$BUILDPLATFORM golang:1.24.2 AS builder
+
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
+ARG TARGETARCH
+ARG TARGETOS=linux
 
 WORKDIR /workspace
+
 # Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
+COPY go.mod go.sum ./
 
 # Copy the go source
 COPY main.go main.go
 COPY plugin/ plugin/
 COPY vendor/ vendor/
 
-ARG TARGETPLATFORM
-ARG TARGETARCH
-ARG TARGETOS
-
-# Build
-RUN go env -w GOPRIVATE=github.org/kubeslice && \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GO111MODULE=on go build -mod=vendor -a -o coredns main.go
+# Build with cross-compilation
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GO111MODULE=on \
+    go build -mod=vendor -ldflags="-w -s" -trimpath -o coredns main.go
 
 FROM gcr.io/distroless/static:nonroot
 
