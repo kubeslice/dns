@@ -1,10 +1,11 @@
 package kubeslice
 
 import (
+	"os"
+
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
-	"os"
 
 	dnsCache "github.com/kubeslice/dns/plugin/kubeslice/cache"
 	kubeslicev1beta1 "github.com/kubeslice/worker-operator/api/v1beta1"
@@ -55,12 +56,15 @@ func setup(c *caddy.Controller) error {
 		return err
 	}
 
+	reconciler := &ServiceImportReconciler{
+		Client:         mgr.GetClient(),
+		EndpointsCache: cache,
+	}
+
 	err = builder.
 		ControllerManagedBy(mgr).               // Create the ControllerManagedBy
 		For(&kubeslicev1beta1.ServiceImport{}). // ReplicaSet is the Application API
-		Complete(&ServiceImportReconciler{
-			EndpointsCache: cache,
-		})
+		Complete(reconciler)
 	if err != nil {
 		log.Error(err, "could not create controller")
 		return err

@@ -97,7 +97,10 @@ func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.R
 	return reconcile.Result{}, nil
 }
 
+// InjectClient is kept for backward compatibility but client is now set directly in setup
 func (r *ServiceImportReconciler) InjectClient(c client.Client) error {
-	r.Client = c
+	if r.Client == nil {
+		r.Client = c
+	}
 	return nil
 }
