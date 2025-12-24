@@ -2,12 +2,14 @@ package kubeslice
 
 import (
 	"context"
+	"fmt"
 
 	dnsCache "github.com/kubeslice/dns/plugin/kubeslice/cache"
 	"github.com/kubeslice/dns/plugin/kubeslice/slice"
 	kubeslicev1beta1 "github.com/kubeslice/worker-operator/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -21,6 +23,7 @@ const finalizerName = "networking.kubeslice.io/dns-finalizer"
 
 // Watch the ServiceImport changes and adjust dns cache accordingly
 func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+	log := ctrl.FromContext(ctx).WithValues("serviceimport", req.NamespacedName)
 
 	si := &kubeslicev1beta1.ServiceImport{}
 	err := r.Get(ctx, req.NamespacedName, si)
@@ -28,7 +31,7 @@ func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	log.Info("got si")
+	log.Info("got serviceimport")
 
 	// examine DeletionTimestamp to determine if object is under deletion
 	if si.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -62,6 +65,12 @@ func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.R
 
 	eps := []slice.Endpoint{}
 
+	// Check if Endpoints are available
+	if len(si.Status.Endpoints) == 0 {
+		log.Info("serviceimport has no endpoints yet, skipping cache update")
+		return reconcile.Result{}, nil
+	}
+
 	for _, ep := range si.Status.Endpoints {
 		endpoint := slice.Endpoint{
 			Host: ep.DNSName,
@@ -83,7 +92,7 @@ func (r *ServiceImportReconciler) Reconcile(ctx context.Context, req reconcile.R
 
 	r.EndpointsCache.Put(si.Name, si.Spec.Slice, si.Namespace, eps)
 
-	log.Info(r.EndpointsCache.GetAll())
+	log.Info("updated endpoints cache", "endpoints", fmt.Sprintf("%+v", r.EndpointsCache.GetAll()))
 
 	return reconcile.Result{}, nil
 }
